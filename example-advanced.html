@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormFlare Advanced Example</title>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e22ce 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 36px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .forms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .form-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .form-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.4);
+        }
+
+        .form-card h2 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 24px;
+        }
+
+        .form-card .description {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #333;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #7e22ce;
+            box-shadow: 0 0 0 3px rgba(126, 34, 206, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .turnstile-container {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #7e22ce 0%, #2a5298 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(126, 34, 206, 0.4);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(126, 34, 206, 0.6);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .required {
+            color: #e74c3c;
+        }
+
+        .stats-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .stats-card h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .stat-value {
+            color: #7e22ce;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .forms-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>FormFlare Demo - Multiple Forms</h1>
+
+        <div class="forms-grid">
+            <!-- Contact Form -->
+            <div class="form-card">
+                <h2>Contact Us</h2>
+                <p class="description">Get in touch with our team</p>
+
+                <div id="contact-message" class="message"></div>
+
+                <form id="contact-form" class="demo-form" data-form-id="contact-form">
+                    <div class="form-group">
+                        <label for="contact-name">Name <span class="required">*</span></label>
+                        <input type="text" id="contact-name" name="name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contact-email">Email <span class="required">*</span></label>
+                        <input type="email" id="contact-email" name="email" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contact-message-text">Message <span class="required">*</span></label>
+                        <textarea id="contact-message-text" name="message" required></textarea>
+                    </div>
+
+                    <div class="turnstile-container">
+                        <div class="cf-turnstile" data-sitekey="YOUR_TURNSTILE_SITE_KEY"></div>
+                    </div>
+
+                    <button type="submit">Send Message</button>
+                </form>
+            </div>
+
+            <!-- Newsletter Form -->
+            <div class="form-card">
+                <h2>Newsletter Signup</h2>
+                <p class="description">Stay updated with our latest news</p>
+
+                <div id="newsletter-message" class="message"></div>
+
+                <form id="newsletter-form" class="demo-form" data-form-id="newsletter-form">
+                    <div class="form-group">
+                        <label for="newsletter-email">Email <span class="required">*</span></label>
+                        <input type="email" id="newsletter-email" name="email" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newsletter-interests">Interests</label>
+                        <select id="newsletter-interests" name="interests" multiple size="3">
+                            <option value="tech">Technology</option>
+                            <option value="business">Business</option>
+                            <option value="design">Design</option>
+                            <option value="marketing">Marketing</option>
+                        </select>
+                    </div>
+
+                    <div class="turnstile-container">
+                        <div class="cf-turnstile" data-sitekey="YOUR_TURNSTILE_SITE_KEY"></div>
+                    </div>
+
+                    <button type="submit">Subscribe</button>
+                </form>
+            </div>
+
+            <!-- Feedback Form -->
+            <div class="form-card">
+                <h2>Product Feedback</h2>
+                <p class="description">Help us improve our product</p>
+
+                <div id="feedback-message" class="message"></div>
+
+                <form id="feedback-form" class="demo-form" data-form-id="feedback-form">
+                    <div class="form-group">
+                        <label for="feedback-rating">Rating <span class="required">*</span></label>
+                        <select id="feedback-rating" name="rating" required>
+                            <option value="">Select rating...</option>
+                            <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                            <option value="4">⭐⭐⭐⭐ Good</option>
+                            <option value="3">⭐⭐⭐ Average</option>
+                            <option value="2">⭐⭐ Poor</option>
+                            <option value="1">⭐ Very Poor</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="feedback-comments">Comments</label>
+                        <textarea id="feedback-comments" name="comments"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="feedback-email">Email (optional)</label>
+                        <input type="email" id="feedback-email" name="email">
+                    </div>
+
+                    <div class="turnstile-container">
+                        <div class="cf-turnstile" data-sitekey="YOUR_TURNSTILE_SITE_KEY"></div>
+                    </div>
+
+                    <button type="submit">Submit Feedback</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Stats Card -->
+        <div class="stats-card">
+            <h2>Submission Statistics</h2>
+            <div class="stat-item">
+                <span class="stat-label">Contact Forms</span>
+                <span class="stat-value" id="contact-count">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Newsletter Signups</span>
+                <span class="stat-value" id="newsletter-count">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Feedback Submissions</span>
+                <span class="stat-value" id="feedback-count">0</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const FORMFLARE_URL = 'https://your-worker.workers.dev/submit';
+
+        // Stats counters
+        const stats = {
+            'contact-form': 0,
+            'newsletter-form': 0,
+            'feedback-form': 0
+        };
+
+        // Load stats from localStorage
+        function loadStats() {
+            const saved = localStorage.getItem('formflare-stats');
+            if (saved) {
+                Object.assign(stats, JSON.parse(saved));
+                updateStatsDisplay();
+            }
+        }
+
+        // Save stats to localStorage
+        function saveStats() {
+            localStorage.setItem('formflare-stats', JSON.stringify(stats));
+            updateStatsDisplay();
+        }
+
+        // Update stats display
+        function updateStatsDisplay() {
+            document.getElementById('contact-count').textContent = stats['contact-form'];
+            document.getElementById('newsletter-count').textContent = stats['newsletter-form'];
+            document.getElementById('feedback-count').textContent = stats['feedback-form'];
+        }
+
+        // Show message
+        function showMessage(formId, text, type) {
+            const messageDiv = document.getElementById(`${formId}-message`);
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type} show`;
+            setTimeout(() => {
+                messageDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        // Get Turnstile token for a form
+        function getTurnstileToken(form) {
+            const turnstileWidget = form.querySelector('.cf-turnstile');
+            if (!turnstileWidget) return null;
+
+            // Get the widget ID from the element
+            const widgetId = turnstileWidget.dataset.widgetId;
+            if (widgetId !== undefined) {
+                return turnstile.getResponse(widgetId);
+            }
+
+            // Fallback: try to get response from any widget
+            return turnstile.getResponse();
+        }
+
+        // Reset Turnstile for a form
+        function resetTurnstile(form) {
+            const turnstileWidget = form.querySelector('.cf-turnstile');
+            if (!turnstileWidget) return;
+
+            const widgetId = turnstileWidget.dataset.widgetId;
+            if (widgetId !== undefined) {
+                turnstile.reset(widgetId);
+            } else {
+                turnstile.reset();
+            }
+        }
+
+        // Handle form submission
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const form = e.target;
+            const formId = form.dataset.formId;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.textContent;
+
+            // Disable submit button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            try {
+                // Get form data
+                const formData = new FormData(form);
+                const data = {};
+
+                // Handle multiple select values
+                for (const [key, value] of formData.entries()) {
+                    if (data[key]) {
+                        // Convert to array if multiple values
+                        if (Array.isArray(data[key])) {
+                            data[key].push(value);
+                        } else {
+                            data[key] = [data[key], value];
+                        }
+                    } else {
+                        data[key] = value;
+                    }
+                }
+
+                // Get Turnstile token
+                const turnstileToken = getTurnstileToken(form);
+
+                if (!turnstileToken) {
+                    showMessage(formId, 'Please complete the verification', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalBtnText;
+                    return;
+                }
+
+                // Submit to FormFlare
+                const response = await fetch(FORMFLARE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        formId: formId,
+                        turnstileToken: turnstileToken,
+                        data: data,
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage(formId, 'Submitted successfully! Thank you.', 'success');
+                    form.reset();
+                    resetTurnstile(form);
+
+                    // Update stats
+                    stats[formId]++;
+                    saveStats();
+                } else {
+                    let errorMsg = result.error || 'Submission failed';
+                    if (result.details && result.details.length > 0) {
+                        errorMsg += ': ' + result.details.join(', ');
+                    }
+                    showMessage(formId, errorMsg, 'error');
+                    resetTurnstile(form);
+                }
+            } catch (error) {
+                console.error('Submission error:', error);
+                showMessage(formId, 'Network error. Please try again.', 'error');
+                resetTurnstile(form);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            }
+        }
+
+        // Initialize forms
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load stats
+            loadStats();
+
+            // Attach event listeners to all forms
+            document.querySelectorAll('.demo-form').forEach(form => {
+                form.addEventListener('submit', handleFormSubmit);
+            });
+
+            // Store widget IDs when Turnstile widgets are rendered
+            window.onloadTurnstileCallback = function () {
+                document.querySelectorAll('.cf-turnstile').forEach((widget, index) => {
+                    widget.dataset.widgetId = index;
+                });
+            };
+        });
+    </script>
+</body>
+
+</html>

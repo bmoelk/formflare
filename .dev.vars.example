@@ -1,0 +1,4 @@
+# Copy this file to .dev.vars for local development
+# DO NOT commit .dev.vars to version control
+
+TURNSTILE_SECRET_KEY=your-turnstile-secret-key-here

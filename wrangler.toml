@@ -1,0 +1,37 @@
+name = "formflare"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Uncomment to use KV for storage
+# [[kv_namespaces]]
+# binding = "FORM_SUBMISSIONS"
+# id = "your-kv-namespace-id"
+# preview_id = "your-preview-kv-namespace-id"
+
+# Uncomment to use D1 for storage (recommended for complex queries)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "formflare-db"
+# database_id = "your-database-id"
+
+# Environment variables
+[vars]
+# CORS Configuration
+ALLOWED_ORIGINS = "*"
+
+# Rate Limiting (set to "true" to enable)
+RATE_LIMIT_ENABLED = "false"
+RATE_LIMIT_REQUESTS = "10"
+RATE_LIMIT_WINDOW = "60"
+
+# Email Notifications
+# Set EMAIL_PROVIDER to: resend, sendgrid, mailgun, mailtrap, or none
+EMAIL_PROVIDER = "none"
+EMAIL_FROM = ""
+EMAIL_TO = ""
+# MAILGUN_DOMAIN = "your-domain.com"  # Only required for Mailgun
+# MAILTRAP_INBOX_ID = "1234567"  # Only required for Mailtrap testing mode
+
+# Secrets (set via: npx wrangler secret put SECRET_NAME)
+# - TURNSTILE_SECRET_KEY (required)
+# - EMAIL_API_KEY (required if EMAIL_PROVIDER is not "none")
