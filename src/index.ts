@@ -21,6 +21,7 @@ type Bindings = {
     MAILGUN_DOMAIN?: string;
     MAILTRAP_INBOX_ID?: string;
     API_KEY?: string;
+    WEBHOOK_URL?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -153,13 +154,36 @@ app.post('/submit', async (c) => {
         };
 
         if (emailConfig.provider !== 'none') {
-            await sendEmailNotification(emailConfig, {
+            const emailPromise = sendEmailNotification(emailConfig, {
                 ...submissionData,
                 submissionId,
             }).catch((error) => {
                 console.error('Email notification failed:', error);
-                // Don't fail the request if email fails
             });
+            c.executionCtx.waitUntil(emailPromise);
+        }
+
+        // Send webhook (if configured)
+        if (c.env.WEBHOOK_URL) {
+            const webhookPromise = fetch(c.env.WEBHOOK_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-FormFlare-Event': 'submission',
+                    'X-FormFlare-Signature': c.env.API_KEY || '' // Simple auth if key exists
+                },
+                body: JSON.stringify({
+                    id: submissionId,
+                    ...submissionData,
+                    timestamp: new Date().toISOString()
+                })
+            }).then(res => {
+                if (!res.ok) console.error(`Webhook failed: ${res.status} ${res.statusText}`);
+            }).catch(err => {
+                console.error('Webhook error:', err);
+            });
+
+            c.executionCtx.waitUntil(webhookPromise);
         }
 
         return c.json({
