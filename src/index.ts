@@ -3,7 +3,7 @@ import { cors } from 'hono/cors';
 import { verifyTurnstile } from './turnstile';
 import { storeSubmission, getSubmissions, getSubmission } from './storage';
 import { checkRateLimit } from './ratelimit';
-import { getFormHandlerJS } from './static';
+
 import { sendEmailNotification, type EmailConfig } from './email';
 
 type Bindings = {
@@ -20,6 +20,7 @@ type Bindings = {
     EMAIL_TO: string;
     MAILGUN_DOMAIN?: string;
     MAILTRAP_INBOX_ID?: string;
+    API_KEY?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -49,16 +50,7 @@ app.get('/', (c) => {
     });
 });
 
-// Serve form-handler.js client library
-app.get('/form-handler.js', (c) => {
-    const jsContent = getFormHandlerJS();
 
-    return c.text(jsContent, 200, {
-        'Content-Type': 'application/javascript; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600',
-        'Access-Control-Allow-Origin': '*',
-    });
-});
 
 // Submit form endpoint
 app.post('/submit', async (c) => {
@@ -70,6 +62,7 @@ app.post('/submit', async (c) => {
         if (rateLimitEnabled) {
             const rateLimitResult = await checkRateLimit(
                 c.env.FORM_SUBMISSIONS,
+                c.env.DB,
                 clientIP,
                 parseInt(c.env.RATE_LIMIT_REQUESTS || '10'),
                 parseInt(c.env.RATE_LIMIT_WINDOW || '60')
@@ -144,9 +137,9 @@ app.post('/submit', async (c) => {
 
         // Store submission
         const submissionId = await storeSubmission(
+            submissionData,
             c.env.FORM_SUBMISSIONS,
             c.env.DB,
-            submissionData
         );
 
         // Send email notification (if configured)
@@ -159,9 +152,8 @@ app.post('/submit', async (c) => {
             mailtrapInboxId: c.env.MAILTRAP_INBOX_ID,
         };
 
-        // Send email asynchronously (don't wait for it)
         if (emailConfig.provider !== 'none') {
-            sendEmailNotification(emailConfig, {
+            await sendEmailNotification(emailConfig, {
                 ...submissionData,
                 submissionId,
             }).catch((error) => {
@@ -190,9 +182,14 @@ app.post('/submit', async (c) => {
 // Get all submissions for a form (requires authentication)
 app.get('/submissions/:formId', async (c) => {
     try {
-        // TODO: Add authentication middleware
+        // Authentication
+        const apiKey = c.env.API_KEY;
+        if (!apiKey) {
+            return c.json({ success: false, error: 'API key not configured' }, 500);
+        }
+
         const authHeader = c.req.header('authorization');
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== apiKey) {
             return c.json({ success: false, error: 'Unauthorized' }, 401);
         }
 
@@ -232,9 +229,14 @@ app.get('/submissions/:formId', async (c) => {
 // Get a specific submission (requires authentication)
 app.get('/submission/:id', async (c) => {
     try {
-        // TODO: Add authentication middleware
+        // Authentication
+        const apiKey = c.env.API_KEY;
+        if (!apiKey) {
+            return c.json({ success: false, error: 'API key not configured' }, 500);
+        }
+
         const authHeader = c.req.header('authorization');
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== apiKey) {
             return c.json({ success: false, error: 'Unauthorized' }, 401);
         }
 
@@ -262,6 +264,76 @@ app.get('/submission/:id', async (c) => {
             {
                 success: false,
                 error: 'Internal server error',
+            },
+            500
+        );
+    }
+});
+
+// Test email configuration (requires authentication)
+app.post('/email-test', async (c) => {
+    try {
+        // Authentication
+        const apiKey = c.env.API_KEY;
+        if (!apiKey) {
+            return c.json({ success: false, error: 'API key not configured' }, 500);
+        }
+
+        const authHeader = c.req.header('authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== apiKey) {
+            return c.json({ success: false, error: 'Unauthorized' }, 401);
+        }
+
+        // Create dummy submission data
+        const submissionData = {
+            formId: 'test-email-form',
+            submissionId: 'test-' + Date.now(),
+            data: {
+                message: 'This is a test email from FormFlare.',
+                timestamp: new Date().toISOString(),
+                test: true
+            },
+            metadata: {
+                ip: c.req.header('cf-connecting-ip') || 'unknown',
+                userAgent: c.req.header('user-agent') || 'unknown',
+                timestamp: new Date().toISOString(),
+            },
+        };
+
+        // Configure email
+        const emailConfig: EmailConfig = {
+            provider: (c.env.EMAIL_PROVIDER?.toLowerCase() as any) || 'none',
+            apiKey: c.env.EMAIL_API_KEY || '',
+            from: c.env.EMAIL_FROM || '',
+            to: c.env.EMAIL_TO || '',
+            mailgunDomain: c.env.MAILGUN_DOMAIN,
+            mailtrapInboxId: c.env.MAILTRAP_INBOX_ID,
+        };
+
+        // Send email
+        const result = await sendEmailNotification(emailConfig, submissionData);
+
+        if (result.success) {
+            return c.json({
+                success: true,
+                message: 'Test email sent successfully',
+                provider: emailConfig.provider
+            });
+        } else {
+            return c.json({
+                success: false,
+                error: 'Failed to send test email',
+                details: result.error
+            }, 500);
+        }
+
+    } catch (error) {
+        console.error('Error sending test email:', error);
+        return c.json(
+            {
+                success: false,
+                error: 'Internal server error',
+                details: error instanceof Error ? error.message : String(error)
             },
             500
         );

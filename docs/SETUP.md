@@ -45,12 +45,12 @@ TURNSTILE_SECRET_KEY=your-actual-secret-key-here
 
 1. Create a KV namespace:
 ```bash
-wrangler kv:namespace create "FORM_SUBMISSIONS"
+wrangler kv namespace create "FORM_SUBMISSIONS"
 ```
 
 2. Create a preview namespace for development:
 ```bash
-wrangler kv:namespace create "FORM_SUBMISSIONS" --preview
+wrangler kv namespace create "FORM_SUBMISSIONS" --preview
 ```
 
 3. Update `wrangler.toml` with the namespace IDs from the output:
@@ -112,13 +112,13 @@ npm run deploy
 
 ## Step 7: Integrate with Your Website
 
-1. Open `example.html` in your editor
+1. Open `examples/example.html` in your editor
 
 2. Update the configuration:
    - Replace `YOUR_TURNSTILE_SITE_KEY` with your Turnstile site key
    - Replace `https://your-worker.workers.dev/submit` with your actual worker URL
 
-3. Upload `example.html` to your static hosting (GitHub Pages, Netlify, etc.)
+3. Upload `examples/example.html` to your static hosting (GitHub Pages, Netlify, etc.)
 
 ## Step 8: Configure CORS (Optional)
 
@@ -182,6 +182,25 @@ Note: This will fail Turnstile verification unless you use a real token from the
 curl -H "Authorization: Bearer your-api-key" \
   https://your-worker.workers.dev/submissions/test-form
 ```
+
+### Test Email Configuration
+
+You can test your email settings without submitting a form using the `/email-test` endpoint. This requires your API key.
+
+```bash
+curl -X POST https://your-worker.workers.dev/email-test \
+  -H "Authorization: Bearer your-api-key"
+```
+
+If successful, you will receive a response like:
+```json
+{
+  "success": true,
+  "message": "Test email sent successfully",
+  "provider": "resend"
+}
+```
+And check the configured email inbox for the test message.
 
 ## Troubleshooting
 

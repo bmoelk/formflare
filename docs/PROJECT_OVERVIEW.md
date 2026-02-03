@@ -24,8 +24,9 @@ formflare/
 │   ├── turnstile.ts      # Turnstile verification logic
 │   ├── storage.ts        # KV and D1 storage implementations
 │   └── ratelimit.ts      # Rate limiting logic
-├── example.html          # Simple contact form example
-├── example-advanced.html # Advanced example with multiple forms
+├── examples/
+│   ├── example.html          # Simple contact form example
+│   └── example-advanced.html # Advanced example with multiple forms
 ├── schema.sql            # D1 database schema
 ├── package.json          # Node.js dependencies
 ├── tsconfig.json         # TypeScript configuration
@@ -183,10 +184,10 @@ See **SETUP.md** for detailed instructions.
 ## Examples
 
 ### Basic Contact Form
-See `example.html` for a simple, beautiful contact form
+See `examples/example.html` for a simple, beautiful contact form
 
 ### Multiple Forms
-See `example-advanced.html` for handling multiple form types on one page
+See `examples/example-advanced.html` for handling multiple form types on one page
 
 ## Development
 
