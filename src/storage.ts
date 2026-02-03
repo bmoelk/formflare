@@ -20,9 +20,9 @@ export interface StoredSubmission extends FormSubmission {
  * Supports both KV and D1 storage
  */
 export async function storeSubmission(
+    submission: FormSubmission,
     kv?: KVNamespace,
     db?: D1Database,
-    submission: FormSubmission
 ): Promise<string> {
     const submissionId = nanoid();
     const storedSubmission: StoredSubmission = {

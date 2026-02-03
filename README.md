@@ -132,7 +132,7 @@ The easiest way to integrate FormFlare is to use the built-in client library:
 - ✅ No need to manually handle tokens
 - ✅ Cleaner, more maintainable code
 
-See `example-with-library.html` for a complete example.
+See `examples/example-with-library.html` for a complete example.
 
 #### Method 2: Manual Integration
 
@@ -195,7 +195,7 @@ For more control, you can manually integrate with the API:
 </html>
 ```
 
-See `example.html` for a complete example.
+See `examples/example.html` for a complete example.
 
 ## API Endpoints
 

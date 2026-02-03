@@ -75,6 +75,7 @@ async function sendViaResend(
       to: config.to.split(',').map(email => email.trim()),
       subject: `New Form Submission: ${submission.formId}`,
       html: generateEmailHTML(submission),
+      text: generateEmailTEXT(submission),
     }),
   });
 
@@ -109,6 +110,10 @@ async function sendViaSendGrid(
       subject: `New Form Submission: ${submission.formId}`,
       content: [
         {
+          type: 'text/plain',
+          value: generateEmailTEXT(submission),
+        },
+        {
           type: 'text/html',
           value: generateEmailHTML(submission),
         },
@@ -140,6 +145,7 @@ async function sendViaMailgun(
   formData.append('to', config.to);
   formData.append('subject', `New Form Submission: ${submission.formId}`);
   formData.append('html', generateEmailHTML(submission));
+  formData.append('text', generateEmailTEXT(submission));
 
   const response = await fetch(
     `https://api.mailgun.net/v3/${config.mailgunDomain}/messages`,
@@ -182,6 +188,7 @@ async function sendViaMailtrap(
       to: config.to.split(',').map(email => ({ email: email.trim() })),
       subject: `New Form Submission: ${submission.formId}`,
       html: generateEmailHTML(submission),
+      text: generateEmailTEXT(submission),
     };
   } else {
     // Production mode - send via Mailtrap Send
@@ -191,6 +198,7 @@ async function sendViaMailtrap(
       to: config.to.split(',').map(email => ({ email: email.trim() })),
       subject: `New Form Submission: ${submission.formId}`,
       html: generateEmailHTML(submission),
+      text: generateEmailTEXT(submission),
     };
   }
 
@@ -203,12 +211,42 @@ async function sendViaMailtrap(
     body: JSON.stringify(body),
   });
 
+  const responseText = await response.text();
+  console.log(responseText);
+
   if (!response.ok) {
-    const error = await response.text();
-    return { success: false, error: `Mailtrap error: ${error}` };
+    // const error = await response.text();
+    return { success: false, error: `Mailtrap error: ${responseText}` };
   }
 
   return { success: true };
+}
+
+/**
+ * Generate text email content
+ */
+function generateEmailTEXT(submission: FormSubmissionData): string {
+  const formDataRows = Object.entries(submission.data)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join('\n');
+
+  return `
+New Form Submission
+===================
+
+Form ID: ${submission.formId}
+Submission ID: ${submission.submissionId}
+Timestamp: ${new Date(submission.metadata.timestamp).toLocaleString()}
+IP Address: ${submission.metadata.ip}
+${submission.metadata.turnstileScore ? `Spam Score: ${submission.metadata.turnstileScore.toFixed(2)}` : ''}
+
+Form Data
+---------
+${formDataRows}
+
+------------------------------------------------
+Sent by FormFlare • Powered by Cloudflare Workers
+  `.trim();
 }
 
 /**

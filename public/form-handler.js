@@ -18,7 +18,7 @@
     const FormFlare = {
         config: {
             workerUrl: '',
-            turnstileSiteKey: '',
+            turnstileSiteKey: null,
             autoInit: true,
             debug: false
         },
@@ -171,7 +171,7 @@
                 // Get Turnstile token
                 const turnstileToken = this.getTurnstileToken(form);
 
-                if (!turnstileToken) {
+                if (this.config.turnstileSiteKey && !turnstileToken) {
                     this.showMessage(form, 'Please complete the verification', 'error');
                     return;
                 }
@@ -312,14 +312,5 @@
 
     // Expose to window
     window.FormFlare = FormFlare;
-
-    // Auto-initialize on DOMContentLoaded if config is set
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            if (FormFlare.config.workerUrl && FormFlare.config.autoInit) {
-                FormFlare.autoInitForms();
-            }
-        });
-    }
 
 })(window);

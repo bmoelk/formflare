@@ -2,6 +2,10 @@ name = "formflare"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
+[assets]
+directory = "public"
+binding = "ASSETS"
+
 # Uncomment to use KV for storage
 # [[kv_namespaces]]
 # binding = "FORM_SUBMISSIONS"
@@ -29,8 +33,12 @@ RATE_LIMIT_WINDOW = "60"
 EMAIL_PROVIDER = "none"
 EMAIL_FROM = ""
 EMAIL_TO = ""
+
 # MAILGUN_DOMAIN = "your-domain.com"  # Only required for Mailgun
 # MAILTRAP_INBOX_ID = "1234567"  # Only required for Mailtrap testing mode
+
+# API Authentication
+API_KEY = "SECRET_API_KEY"
 
 # Secrets (set via: npx wrangler secret put SECRET_NAME)
 # - TURNSTILE_SECRET_KEY (required)

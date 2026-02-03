@@ -297,8 +297,8 @@ The `/form-handler.js` endpoint has CORS enabled by default. If you're still see
 ## Examples
 
 See the following example files:
-- `example-with-library.html` - Basic usage with single form
-- `example-advanced.html` - Multiple forms with statistics
+- `examples/example-with-library.html` - Basic usage with single form
+- `examples/example-advanced.html` - Multiple forms with statistics
 
 ## License
 
