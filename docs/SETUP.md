@@ -156,6 +156,31 @@ curl -H "Authorization: Bearer your-api-key" \
   https://your-worker.workers.dev/submissions/contact-form
 ```
 
+## Step 10: Configure Webhooks (Optional)
+
+You can configure FormFlare to send a JSON POST request to a webhook URL whenever a form is submitted successfully.
+
+1. Set the webhook URL:
+```bash
+wrangler secret put WEBHOOK_URL
+# Enter your webhook URL when prompted
+```
+
+The webhook payload will look like this:
+```json
+{
+  "id": "submission-id",
+  "formId": "contact-form",
+  "data": { ... },
+  "metadata": { ... },
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+Headers included:
+- `X-FormFlare-Event`: `submission`
+- `X-FormFlare-Signature`: Your `API_KEY` (if configured)
+
 ## Testing Your Setup
 
 ### Test Form Submission
@@ -225,7 +250,6 @@ And check the configured email inbox for the test message.
 
 - Set up email notifications for new submissions
 - Create an admin dashboard to view submissions
-- Add webhook support to integrate with other services
 - Implement custom validation rules
 - Add file upload support
 

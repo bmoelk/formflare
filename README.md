@@ -10,6 +10,7 @@ FormFlare is a Cloudflare Worker that provides a complete backend solution for c
 - 💾 **Flexible Storage** - Choose between Cloudflare KV (simple) or D1 (SQL) databases
 - 🚦 **Rate Limiting** - Optional IP-based rate limiting with configurable limits
 - 📧 **Email Notifications** - Automatic email alerts via Resend, SendGrid, or Mailgun
+- 🔗 **Webhooks** - Send successful submissions to any external URL
 - 🌐 **CORS Support** - Easy integration with any static website
 - 🔐 **Secure** - API key authentication for retrieving submissions
 - ⚡ **Fast** - Runs on Cloudflare's global edge network (200+ locations)
@@ -308,6 +309,7 @@ Set in `wrangler.toml` or via `wrangler secret put`:
 - `ALLOWED_ORIGINS` - Comma-separated list of allowed origins (default: "*")
 - `RATE_LIMIT_REQUESTS` - Max requests per window (default: 10)
 - `RATE_LIMIT_WINDOW` - Rate limit window in seconds (default: 60)
+- `WEBHOOK_URL` - Optional URL to send form submissions to (POST)
 
 ### Storage Options
 
