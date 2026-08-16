@@ -1,4 +1,21 @@
-# Copy this file to .dev.vars for local development
-# DO NOT commit .dev.vars to version control
+# FormFlare Development Environment Variables
+# Copy this file to .dev.vars for local development:
+#   cp .dev.vars.example .dev.vars
+# DO NOT commit .dev.vars to version control!
 
-TURNSTILE_SECRET_KEY=your-turnstile-secret-key-here
+# Explicit Dev Flags
+ENVIRONMENT=development
+DEV_MODE=true
+DEV_MOCK_TURNSTILE=true
+ALLOWED_ORIGINS=*
+
+# Cloudflare Turnstile Test Secret Key (official dummy key that always passes)
+TURNSTILE_SECRET_KEY=1x00000000000000000000AA00000000000
+
+# Local Email Provider (logs formatted emails to stdout console)
+EMAIL_PROVIDER=console
+EMAIL_FROM=noreply@localhost
+EMAIL_TO=dev@example.com
+
+# Local API Key for authenticating GET /submissions/:formId
+API_KEY=dev-secret-key-123
