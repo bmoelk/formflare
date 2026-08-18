@@ -4,12 +4,27 @@
 export async function verifyTurnstile(
     token: string,
     secretKey: string,
-    remoteIP: string
+    remoteIP: string,
+    isDevMock: boolean = false
 ): Promise<{
     success: boolean;
     score?: number;
     errors?: string[];
 }> {
+    // Explicit Dev Mode or Dummy Test Token Auto-Pass
+    if (
+        isDevMock ||
+        token === 'dev' ||
+        token === '1x00000000000000000000AA' ||
+        secretKey === '1x00000000000000000000AA00000000000'
+    ) {
+        console.log('⚡ [FormFlare Turnstile] Dev Mock Verification Auto-Passed');
+        return {
+            success: true,
+            score: 1.0,
+        };
+    }
+
     const formData = new FormData();
     formData.append('secret', secretKey);
     formData.append('response', token);
@@ -24,7 +39,7 @@ export async function verifyTurnstile(
             }
         );
 
-        const result = await response.json() as {
+        const result = (await response.json()) as {
             success: boolean;
             score?: number;
             'error-codes'?: string[];

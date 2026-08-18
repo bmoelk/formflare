@@ -74,8 +74,8 @@ export async function storeSubmission(
  * Get submissions for a specific form
  */
 export async function getSubmissions(
-    kv?: KVNamespace,
-    db?: D1Database,
+    kv: KVNamespace | undefined,
+    db: D1Database | undefined,
     formId: string,
     limit: number = 100,
     offset: number = 0
@@ -123,8 +123,8 @@ export async function getSubmissions(
  * Get a specific submission by ID
  */
 export async function getSubmission(
-    kv?: KVNamespace,
-    db?: D1Database,
+    kv: KVNamespace | undefined,
+    db: D1Database | undefined,
     submissionId: string
 ): Promise<StoredSubmission | null> {
     if (db) {

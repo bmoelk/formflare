@@ -4,7 +4,7 @@
  */
 
 export interface EmailConfig {
-  provider: 'resend' | 'sendgrid' | 'mailgun' | 'mailtrap' | 'none';
+  provider: 'console' | 'resend' | 'sendgrid' | 'mailgun' | 'mailtrap' | 'none';
   apiKey: string;
   from: string;
   to: string;
@@ -31,8 +31,16 @@ export async function sendEmailNotification(
   config: EmailConfig,
   submission: FormSubmissionData
 ): Promise<{ success: boolean; error?: string }> {
-  if (config.provider === 'none' || !config.apiKey || !config.to) {
+  if (config.provider === 'none') {
     return { success: true }; // Skip if not configured
+  }
+
+  if (config.provider === 'console') {
+    return sendViaConsole(config, submission);
+  }
+
+  if (!config.apiKey || !config.to) {
+    return { success: true };
   }
 
   try {
@@ -55,6 +63,30 @@ export async function sendEmailNotification(
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
+}
+
+/**
+ * Send email via Console (Dev Output)
+ */
+function sendViaConsole(
+  config: EmailConfig,
+  submission: FormSubmissionData
+): { success: boolean } {
+  console.log(`
+┌────────────────────────────────────────────────────────────────────────┐
+│ 📧 [FormFlare Dev Email Logger]                                       │
+├────────────────────────────────────────────────────────────────────────┤
+│ Form ID:        ${submission.formId}
+│ Submission ID:  ${submission.submissionId}
+│ To:             ${config.to || 'dev@example.com'}
+│ From:           ${config.from || 'noreply@localhost'}
+│ Subject:        New Form Submission: ${submission.formId}
+├────────────────────────────────────────────────────────────────────────┤
+│ Form Data:
+${JSON.stringify(submission.data, null, 2)}
+└────────────────────────────────────────────────────────────────────────┘
+`);
+  return { success: true };
 }
 
 /**

@@ -6,40 +6,34 @@ compatibility_date = "2024-01-01"
 directory = "public"
 binding = "ASSETS"
 
-# Uncomment to use KV for storage
-# [[kv_namespaces]]
-# binding = "FORM_SUBMISSIONS"
-# id = "your-kv-namespace-id"
-# preview_id = "your-preview-kv-namespace-id"
-
-# Uncomment to use D1 for storage (recommended for complex queries)
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "formflare-db"
-# database_id = "your-database-id"
-
-# Environment variables
+# Public Non-Sensitive Configuration Defaults
+# ZERO secrets, private email addresses, or custom domain routes should be stored here!
 [vars]
-# CORS Configuration
+ENVIRONMENT = "production"
 ALLOWED_ORIGINS = "*"
 
-# Rate Limiting (set to "true" to enable)
+# Rate Limiting Configuration
 RATE_LIMIT_ENABLED = "false"
 RATE_LIMIT_REQUESTS = "10"
 RATE_LIMIT_WINDOW = "60"
 
-# Email Notifications
-# Set EMAIL_PROVIDER to: resend, sendgrid, mailgun, mailtrap, or none
+# Default Email Provider (options: none, console, resend, sendgrid, mailgun, mailtrap)
 EMAIL_PROVIDER = "none"
-EMAIL_FROM = ""
-EMAIL_TO = ""
 
-# MAILGUN_DOMAIN = "your-domain.com"  # Only required for Mailgun
-# MAILTRAP_INBOX_ID = "1234567"  # Only required for Mailtrap testing mode
+# Infrastructure Bindings (Placeholders only - bound via Cloudflare Dashboard or wrangler.local.toml)
+# [[kv_namespaces]]
+# binding = "FORM_SUBMISSIONS"
+# id = "YOUR_KV_NAMESPACE_ID"
 
-# API Authentication
-API_KEY = "SECRET_API_KEY"
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "formflare-db"
+# database_id = "YOUR_DATABASE_ID"
 
-# Secrets (set via: npx wrangler secret put SECRET_NAME)
-# - TURNSTILE_SECRET_KEY (required)
-# - EMAIL_API_KEY (required if EMAIL_PROVIDER is not "none")
+# Production Secrets (Set via: npx wrangler secret put SECRET_NAME)
+# - TURNSTILE_SECRET_KEY (Required)
+# - API_KEY (Required for GET /submissions)
+# - EMAIL_API_KEY (Required if EMAIL_PROVIDER != "none" or "console")
+# - EMAIL_FROM (Required if EMAIL_PROVIDER != "none" or "console")
+# - EMAIL_TO (Required if EMAIL_PROVIDER != "none" or "console")
+# - WEBHOOK_URL (Optional webhook trigger)

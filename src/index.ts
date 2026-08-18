@@ -9,15 +9,18 @@ import { sendEmailNotification, type EmailConfig } from './email';
 type Bindings = {
     FORM_SUBMISSIONS?: KVNamespace;
     DB?: D1Database;
-    TURNSTILE_SECRET_KEY: string;
-    ALLOWED_ORIGINS: string;
-    RATE_LIMIT_ENABLED: string;
-    RATE_LIMIT_REQUESTS: string;
-    RATE_LIMIT_WINDOW: string;
-    EMAIL_PROVIDER: string;
-    EMAIL_API_KEY: string;
-    EMAIL_FROM: string;
-    EMAIL_TO: string;
+    ENVIRONMENT?: string;
+    DEV_MODE?: string;
+    DEV_MOCK_TURNSTILE?: string;
+    TURNSTILE_SECRET_KEY?: string;
+    ALLOWED_ORIGINS?: string;
+    RATE_LIMIT_ENABLED?: string;
+    RATE_LIMIT_REQUESTS?: string;
+    RATE_LIMIT_WINDOW?: string;
+    EMAIL_PROVIDER?: string;
+    EMAIL_API_KEY?: string;
+    EMAIL_FROM?: string;
+    EMAIL_TO?: string;
     MAILGUN_DOMAIN?: string;
     MAILTRAP_INBOX_ID?: string;
     API_KEY?: string;
@@ -28,7 +31,7 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 // CORS middleware
 app.use('/*', async (c, next) => {
-    const allowedOrigins = c.env.ALLOWED_ORIGINS.split(',');
+    const allowedOrigins = (c.env.ALLOWED_ORIGINS || '*').split(',');
     const origin = c.req.header('origin') || '*';
 
     const corsMiddleware = cors({
@@ -106,11 +109,17 @@ app.post('/submit', async (c) => {
             );
         }
 
+        const isDevMock =
+            c.env.DEV_MOCK_TURNSTILE === 'true' ||
+            c.env.DEV_MODE === 'true' ||
+            c.env.ENVIRONMENT === 'development';
+
         // Verify Turnstile token
         const turnstileResult = await verifyTurnstile(
             turnstileToken,
-            c.env.TURNSTILE_SECRET_KEY,
-            clientIP
+            c.env.TURNSTILE_SECRET_KEY || '',
+            clientIP,
+            isDevMock
         );
 
         if (!turnstileResult.success) {

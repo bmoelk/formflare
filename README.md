@@ -1,92 +1,79 @@
 # FormFlare 🚀
 
-**A powerful, spam-protected form backend for static websites**
+**A powerful, spam-protected form backend for static websites built on Cloudflare Workers, Hono, and D1/KV**
 
-FormFlare is a Cloudflare Worker that provides a complete backend solution for collecting form submissions from static websites. It combines Cloudflare's Turnstile spam protection with flexible storage options, making it perfect for contact forms, newsletter signups, feedback forms, and more.
+FormFlare provides a complete, edge-native backend for collecting form submissions from static websites. It combines Cloudflare Turnstile spam protection with flexible storage, rate limiting, and local DX mocking.
 
-## ✨ Features
+---
 
-- 🛡️ **Turnstile Integration** - Built-in spam protection using Cloudflare Turnstile (CAPTCHA alternative)
-- 💾 **Flexible Storage** - Choose between Cloudflare KV (simple) or D1 (SQL) databases
-- 🚦 **Rate Limiting** - Optional IP-based rate limiting with configurable limits
-- 📧 **Email Notifications** - Automatic email alerts via Resend, SendGrid, or Mailgun
-- 🔗 **Webhooks** - Send successful submissions to any external URL
-- 🌐 **CORS Support** - Easy integration with any static website
-- 🔐 **Secure** - API key authentication for retrieving submissions
-- ⚡ **Fast** - Runs on Cloudflare's global edge network (200+ locations)
-- 📊 **Multiple Forms** - Support unlimited forms with unique identifiers
-- 💰 **Free Tier** - Runs completely free for most small-medium websites
-- 🎨 **Beautiful Examples** - Includes ready-to-use HTML examples
-- 📚 **Client Library** - Optional JavaScript library for easier integration
+## ✨ Key Features
 
-## 📚 Documentation
+* 🛡️ **Turnstile Integration** — Built-in spam protection using Cloudflare Turnstile (with local dev auto-mocking).
+* 💾 **Flexible Storage** — Choose between Cloudflare KV (key-value) or D1 (SQLite SQL) databases.
+* 🛠️ **Interactive Setup Wizard** — Run `npm run setup` for guided configuration and clear manifest summaries.
+* 🔒 **Zero-Secrets Security Architecture** — 100% safe for public Git repositories; no credentials in `wrangler.toml`.
+* 🔍 **Pre-Commit Security Scanner** — Automated scanner (`npm run scan-secrets`) to block staged credential leaks.
+* 📧 **Multi-Provider Email Alerts** — Outbound email notifications via Resend, SendGrid, Mailgun, Mailtrap, or local stdout console logger (`EMAIL_PROVIDER=console`).
+* ⚡ **Edge Performance** — Sub-50ms global response times on Cloudflare's edge network.
 
-- **[PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)** - Comprehensive project overview and architecture
-- **[SETUP.md](docs/SETUP.md)** - Step-by-step setup and deployment guide
-- **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Quick reference for common tasks and API usage
-- **[EMAIL_NOTIFICATIONS.md](docs/EMAIL_NOTIFICATIONS.md)** - Email notification setup and configuration
-- **[CLIENT_LIBRARY.md](docs/CLIENT_LIBRARY.md)** - Client library API reference and examples
-- **[MULTIPLE_SITES.md](docs/MULTIPLE_SITES.md)** - Guide for supporting multiple websites
+---
+
+## 📚 Documentation Index
+
+All detailed guides and architecture references are maintained in the [`docs/`](docs/) directory:
+
+* 📖 **[SECURITY_AND_DX.md](docs/SECURITY_AND_DX.md)** — Security architecture, secrets rulebook, setup wizard, & pre-commit scanner.
+* 📡 **[API_ENDPOINTS.md](docs/API_ENDPOINTS.md)** — Complete REST API specification, headers, and payload samples.
+* 📋 **[SETUP.md](docs/SETUP.md)** — Step-by-step setup and deployment guide.
+* 📑 **[PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)** — Comprehensive architecture and project overview.
+* ⚡ **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** — API endpoints, payloads, and quick commands.
+* ✉️ **[EMAIL_NOTIFICATIONS.md](docs/EMAIL_NOTIFICATIONS.md)** — Provider setup (Resend, SendGrid, Mailgun, Mailtrap, Console).
+* 🌐 **[MULTIPLE_SITES.md](docs/MULTIPLE_SITES.md)** — Supporting multiple client domains and forms.
+* 💻 **[CLIENT_LIBRARY.md](docs/CLIENT_LIBRARY.md)** — Client JavaScript library reference.
+
+---
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### 1. Install & Configure
 
 ```bash
+# Install dependencies
 npm install
+
+# Run interactive setup wizard
+npm run setup
 ```
 
-### 2. Configure Storage
-
-#### Option A: Using KV (Simple, good for small-medium volume)
+### 2. Run Local Development Server
 
 ```bash
-# Create KV namespace
-npx wrangler kv namespace create "FORM_SUBMISSIONS"
-npx wrangler kv namespace create "FORM_SUBMISSIONS" --preview
-
-# Update wrangler.toml with the namespace IDs
+# Start local dev server (uses local D1/KV SQLite mock & stdout email logger)
+npm run dev
 ```
 
-#### Option B: Using D1 (Recommended for complex queries)
+FormFlare will start locally at `http://localhost:8787`.
+
+### 3. Deploy to Cloudflare
 
 ```bash
-# Create D1 database
-npx wrangler d1 create formflare-db
-
-# Create the schema
-npx wrangler d1 execute formflare-db --file=./schema.sql
-
-# Update wrangler.toml with the database ID
-```
-
-### 3. Set Up Turnstile
-
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. Navigate to Turnstile
-3. Create a new site
-4. Copy your site key and secret key
-
-```bash
-# Set the secret key
+# Set production secrets in Cloudflare KMS
 npx wrangler secret put TURNSTILE_SECRET_KEY
-# enter secret key value when prompted
-```
+npx wrangler secret put API_KEY
 
-### 4. Deploy
-
-```bash
-# Deploy to Cloudflare
+# Deploy to Cloudflare Workers / Pages
 npm run deploy
 ```
 
-### Frontend Integration
+---
 
-FormFlare offers two ways to integrate with your static website:
+### 🎨 Frontend Integration
 
-#### Method 1: Using the FormFlare Client Library (Recommended)
+FormFlare offers two clean ways to integrate with your static website:
 
-The easiest way to integrate FormFlare is to use the built-in client library:
+#### Method 1: Built-in Client Library (Recommended)
+
+The easiest way to integrate FormFlare is to load the built-in client library script served directly by your Worker:
 
 ```html
 <!DOCTYPE html>
@@ -101,8 +88,7 @@ The easiest way to integrate FormFlare is to use the built-in client library:
         <input type="email" name="email" placeholder="Email" required>
         <textarea name="message" placeholder="Message" required></textarea>
         
-        <!-- Turnstile widget will be added automatically -->
-        
+        <!-- Turnstile widget will be injected automatically -->
         <button type="submit">Submit</button>
     </form>
 
@@ -117,7 +103,7 @@ The easiest way to integrate FormFlare is to use the built-in client library:
             autoInit: true  // Automatically handles forms with data-formflare
         });
 
-        // Optional: Listen to events
+        // Optional: Listen to submission events
         document.getElementById('contact-form').addEventListener('formflare:success', (e) => {
             console.log('Submitted!', e.detail.submissionId);
         });
@@ -126,18 +112,9 @@ The easiest way to integrate FormFlare is to use the built-in client library:
 </html>
 ```
 
-**Benefits:**
-- ✅ Automatic Turnstile widget injection
-- ✅ Built-in error handling and user feedback
-- ✅ Custom events for success/error handling
-- ✅ No need to manually handle tokens
-- ✅ Cleaner, more maintainable code
+#### Method 2: Manual API Fetch Integration
 
-See `examples/example-with-library.html` for a complete example.
-
-#### Method 2: Manual Integration
-
-For more control, you can manually integrate with the API:
+For complete custom control, you can post directly to the `/submit` endpoint:
 
 ```html
 <!DOCTYPE html>
@@ -167,7 +144,7 @@ For more control, you can manually integrate with the API:
         const turnstileToken = turnstile.getResponse();
         
         if (!turnstileToken) {
-            alert('Please complete the verification');
+            alert('Please complete the anti-spam verification');
             return;
         }
         
@@ -182,7 +159,6 @@ For more control, you can manually integrate with the API:
         });
         
         const result = await response.json();
-        
         if (result.success) {
             alert('Form submitted successfully!');
             e.target.reset();
@@ -196,154 +172,18 @@ For more control, you can manually integrate with the API:
 </html>
 ```
 
-See `examples/example.html` for a complete example.
+---
 
-## API Endpoints
+## 🔍 Pre-Commit Security Scanner
 
-### GET `/`
-
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "service": "FormFlare",
-  "version": "1.0.0",
-  "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00.000Z"
-}
-```
-
-### GET `/form-handler.js`
-
-Serves the FormFlare client library JavaScript file.
-
-**Response:** JavaScript file with `Content-Type: application/javascript`
-
-**Usage:**
-```html
-<script src="https://your-worker.workers.dev/form-handler.js"></script>
-```
-
-This endpoint serves the client library with proper caching headers (`Cache-Control: public, max-age=3600`) and CORS headers for easy integration from any domain.
-
-### POST `/submit`
-
-Submit a form with Turnstile verification.
-
-**Request:**
-```json
-{
-  "formId": "contact-form",
-  "turnstileToken": "token-from-widget",
-  "data": {
-    "name": "John Doe",
-    "email": "john@example.com",
-    "message": "Hello!"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "submissionId": "abc123",
-  "message": "Form submitted successfully"
-}
-```
-
-### GET `/submissions/:formId`
-
-Get all submissions for a specific form (requires authentication).
-
-**Headers:**
-```
-Authorization: Bearer YOUR_API_KEY
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "formId": "contact-form",
-  "submissions": [
-    {
-      "id": "abc123",
-      "formId": "contact-form",
-      "data": {
-        "name": "John Doe",
-        "email": "john@example.com"
-      },
-      "metadata": {
-        "ip": "1.2.3.4",
-        "userAgent": "Mozilla/5.0...",
-        "timestamp": "2024-01-01T00:00:00.000Z",
-        "turnstileScore": 0.9
-      }
-    }
-  ],
-  "pagination": {
-    "limit": 100,
-    "offset": 0
-  }
-}
-```
-
-### GET `/submission/:id`
-
-Get a specific submission by ID (requires authentication).
-
-**Headers:**
-```
-Authorization: Bearer YOUR_API_KEY
-```
-
-## Configuration
-
-### Environment Variables
-
-Set in `wrangler.toml` or via `wrangler secret put`:
-
-- `TURNSTILE_SECRET_KEY` - Your Turnstile secret key (use secrets)
-- `ALLOWED_ORIGINS` - Comma-separated list of allowed origins (default: "*")
-- `RATE_LIMIT_REQUESTS` - Max requests per window (default: 10)
-- `RATE_LIMIT_WINDOW` - Rate limit window in seconds (default: 60)
-- `WEBHOOK_URL` - Optional URL to send form submissions to (POST)
-
-### Storage Options
-
-**KV Namespace:**
-- Good for simple storage needs
-- Easy to set up
-- Limited query capabilities
-
-**D1 Database:**
-- Better for complex queries
-- More efficient for large volumes
-- Requires schema setup
-
-## Development
+Before committing code, run the dynamic security scanner to verify zero credential or route leaks:
 
 ```bash
-# Start local development server
-npm run dev
-
-# Deploy to production
-npm run deploy
-
-# View logs
-npm run tail
+npm run scan-secrets
 ```
 
-## Security Considerations
+---
 
-1. **API Authentication**: Implement proper API key management for the retrieval endpoints
-2. **CORS**: Configure `ALLOWED_ORIGINS` to restrict access to your domains
-3. **Rate Limiting**: Adjust rate limits based on your needs
-4. **Data Validation**: Add additional validation for form data as needed
-5. **Secrets Management**: Always use `wrangler secret` for sensitive values
+## 📄 License
 
-## License
-
-MIT
+MIT © [Brian Moelk](https://github.com/bmoelk)

@@ -7,7 +7,9 @@
         "dev": "wrangler dev",
         "deploy": "wrangler deploy",
         "tail": "wrangler tail",
-        "test": "vitest"
+        "test": "vitest",
+        "setup": "node scripts/setup.js",
+        "scan-secrets": "bash scripts/scan-secrets.sh"
     },
     "keywords": [
         "cloudflare",
