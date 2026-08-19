@@ -44,11 +44,16 @@ For a shared instance, you have two options for Turnstile:
 4. Use this single Site Key on all your websites
 5. Use the single Secret Key in your worker
 
-#### B. Multiple Widgets (Advanced)
-If you need separate Turnstile analytics for each site:
-1. Create separate widgets for each site
-2. This requires updating the worker code to support multiple secret keys (mapped by hostname or form ID)
-3. **Recommendation:** If you need this level of separation, use **Option 2 (Multiple Instances)** instead.
+#### B. Per-Site Widgets (Recommended for Multi-Site Isolation)
+If you need separate Turnstile widgets per site (or hit Cloudflare's 10-hostname limit per widget):
+1. Create a Turnstile widget for each domain in the Cloudflare Dashboard.
+2. Put each site's public **Site Key** in its respective website frontend HTML/JS.
+3. Store each site's private **Secret Key** in the Worker secret store using the format `TURNSTILE_SECRET_KEY_${SITE_PREFIX}`:
+   ```bash
+   npx wrangler secret put TURNSTILE_SECRET_KEY_BRAINENDEAVOR
+   npx wrangler secret put TURNSTILE_SECRET_KEY_SPLITPHASE
+   ```
+4. FormFlare automatically resolves the Turnstile secret key based on the `formId` site prefix (e.g., `brainendeavor_contact` -> `TURNSTILE_SECRET_KEY_BRAINENDEAVOR`), falling back to `TURNSTILE_SECRET_KEY` if a per-site secret is not defined.
 
 ### Pros & Cons
 *   ✅ **Pros**: Single deployment to manage, free tier covers a lot of usage (100k req/day), centralized data.

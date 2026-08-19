@@ -23,19 +23,20 @@ async function main() {
 └─────────────────────────────────────────────────────────────┘
 `);
 
-  console.log('Select setup target:');
-  console.log('  1. Local Development (.dev.vars)');
-  console.log('  2. Custom Local Domain Route (wrangler.local.toml)');
-  console.log('  3. Cloudflare Production Secrets Helper\n');
+  console.log('Select Setup Mode:');
+  console.log('  1. 🛠️  Local Development Setup      [RECOMMENDED FOR LOCAL DEV]');
+  console.log('  2. 🚀 Production Deployment Setup     [REQUIRED FOR PROD DEPLOY]');
+  console.log('  3. ⚙️  Advanced Developer Tools     [OPTIONAL]');
+  console.log('');
 
   const choice = (await askQuestion('Enter choice (1-3) [default: 1]: ')).trim() || '1';
 
   if (choice === '1') {
     await setupLocalDev();
   } else if (choice === '2') {
-    await setupLocalRoute();
+    await setupProdDeployment();
   } else if (choice === '3') {
-    await setupProdSecrets();
+    await setupAdvancedMenu();
   } else {
     console.log('Invalid choice. Exiting.');
   }
@@ -44,7 +45,9 @@ async function main() {
 }
 
 async function setupLocalDev() {
-  console.log('\n--- Local Development Setup (.dev.vars) ---');
+  console.log('\n--- 🛠️  Local Development Environment Setup (.dev.vars) ---');
+  console.log('This sets up your git-ignored local environment file (.dev.vars) for offline development.\n');
+
   const provider = (await askQuestion('Select Email Provider (console/none/resend/mailgun/sendgrid) [console]: ')).trim() || 'console';
   const emailTo = (await askQuestion('Enter notification target email (EMAIL_TO) [dev@example.com]: ')).trim() || 'dev@example.com';
   const emailFrom = (await askQuestion('Enter sender email (EMAIL_FROM) [noreply@localhost]: ')).trim() || 'noreply@localhost';
@@ -84,9 +87,75 @@ API_KEY=${apiKey}
   });
 }
 
+async function setupProdDeployment() {
+  console.log('\n--- 🚀 Production Deployment Setup ---');
+  console.log('Configures production environment variables & generates secret provisioning commands.\n');
+
+  const allowedOrigins = (await askQuestion('Enter allowed CORS origins (ALLOWED_ORIGINS) [e.g. https://brainendeavor.com,https://splitphase.io]: ')).trim() || '*';
+  const emailTo = (await askQuestion('Enter production alert recipient (EMAIL_TO) [e.g. alerts@yourdomain.com]: ')).trim();
+  const provider = (await askQuestion('Select Production Email Provider (resend/sendgrid/mailgun/none) [resend]: ')).trim() || 'resend';
+
+  console.log('\n📌 Save local production overrides to git-ignored .dev.vars? (y/N): ');
+  const saveLocal = (await askQuestion('')).trim().toLowerCase();
+
+  if (saveLocal === 'y' || saveLocal === 'yes') {
+    const devVarsPath = path.join(__dirname, '..', '.dev.vars');
+    let existingContent = fs.existsSync(devVarsPath) ? fs.readFileSync(devVarsPath, 'utf-8') : '';
+
+    const newVars = `
+# Production Overrides (Saved via Setup Wizard)
+ENVIRONMENT=production
+ALLOWED_ORIGINS=${allowedOrigins}
+EMAIL_PROVIDER=${provider}
+${emailTo ? `EMAIL_TO=${emailTo}` : ''}
+`;
+    fs.writeFileSync(devVarsPath, existingContent + newVars, 'utf-8');
+    console.log('✅ Appended production overrides to .dev.vars');
+  }
+
+  console.log('\n📌 Cloudflare KMS Production Secret Commands');
+  console.log('Execute the following commands in your terminal to set production secrets in Cloudflare KMS:\n');
+  console.log('  npx wrangler secret put TURNSTILE_SECRET_KEY');
+  console.log('  npx wrangler secret put API_KEY');
+  if (provider !== 'none') {
+    console.log('  npx wrangler secret put EMAIL_API_KEY');
+  }
+
+  printManifest({
+    modifiedFiles: [],
+    nextSteps: [
+      'Set Cloudflare KMS secrets above.',
+      'Deploy to Cloudflare Workers: npx wrangler deploy',
+    ],
+  });
+}
+
+async function setupAdvancedMenu() {
+  console.log('\n--- ⚙️  Advanced Developer Tools (Optional) ---');
+  console.log('  1. Custom Local Domain Route (wrangler.local.toml)');
+  console.log('     ℹ️  Optional: Useful for testing same-origin CORS, cookies, or custom domain routing locally.');
+  console.log('  2. Multi-Tenant Per-Site Secrets & Webhooks Helper');
+  console.log('     ℹ️  Optional: Generate secret commands for multi-site keys (e.g. TURNSTILE_SECRET_KEY_BRAINENDEAVOR).\n');
+
+  const choice = (await askQuestion('Enter choice (1-2) [default: 1]: ')).trim() || '1';
+
+  if (choice === '1') {
+    await setupLocalRoute();
+  } else if (choice === '2') {
+    await setupMultiSiteSecrets();
+  } else {
+    console.log('Invalid choice.');
+  }
+}
+
 async function setupLocalRoute() {
-  console.log('\n--- Custom Domain Route Setup (wrangler.local.toml) ---');
-  const customDomain = (await askQuestion('Enter custom domain pattern (e.g. contact.splitphase.io): ')).trim();
+  console.log('\n--- 🌐 Custom Domain Route Setup (wrangler.local.toml) [OPTIONAL] ---');
+  console.log('ℹ️  Purpose & Use Case:');
+  console.log('  This creates an uncommitted wrangler.local.toml file for testing local domain routes.');
+  console.log('  Use this if you are testing same-origin CORS headers, cookies, or custom local domains');
+  console.log('  (e.g., contact.splitphase.local via /etc/hosts) before deploying to production.\n');
+
+  const customDomain = (await askQuestion('Enter custom domain pattern (e.g. contact.splitphase.local): ')).trim();
 
   if (!customDomain) {
     console.log('No domain provided. Skipping.');
@@ -115,27 +184,34 @@ custom_domain = true
       },
     ],
     nextSteps: [
-      `Deploy using local config: npx wrangler deploy -c wrangler.local.toml`,
-      `Verify DNS binding in Cloudflare Dashboard`,
+      `Run local dev with local config: npx wrangler dev -c wrangler.local.toml`,
+      `Map 127.0.0.1 ${customDomain} in your local /etc/hosts file if testing locally.`,
     ],
   });
 }
 
-async function setupProdSecrets() {
-  console.log('\n--- Production Secrets Deployment Commands ---');
-  console.log('Run the following CLI commands to configure Cloudflare Production Secrets safely:\n');
+async function setupMultiSiteSecrets() {
+  console.log('\n--- 🗝️  Multi-Tenant Per-Site Secrets & Webhooks Helper [OPTIONAL] ---');
+  console.log('FormFlare supports site-specific Turnstile keys and Webhook URLs based on siteId.\n');
 
-  console.log('  npx wrangler secret put TURNSTILE_SECRET_KEY');
-  console.log('  npx wrangler secret put API_KEY');
-  console.log('  npx wrangler secret put EMAIL_API_KEY');
-  console.log('  npx wrangler secret put EMAIL_FROM');
-  console.log('  npx wrangler secret put EMAIL_TO');
+  const siteId = (await askQuestion('Enter target site identifier (siteId) [e.g. brainendeavor]: ')).trim();
+
+  if (!siteId) {
+    console.log('No site ID provided. Skipping.');
+    return;
+  }
+
+  const cleanSiteId = siteId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+  console.log(`\nCommands for site '${siteId}' (Prefix: ${cleanSiteId}):\n`);
+  console.log(`  npx wrangler secret put TURNSTILE_SECRET_KEY_${cleanSiteId}`);
+  console.log(`  npx wrangler secret put WEBHOOK_URL_${cleanSiteId}`);
+  console.log('');
 
   printManifest({
     modifiedFiles: [],
     nextSteps: [
-      'Execute the secret dispatches above in your terminal.',
-      'Deploy clean worker: npx wrangler deploy',
+      `Run secret commands above for site: ${cleanSiteId}`,
     ],
   });
 }

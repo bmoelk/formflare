@@ -257,20 +257,83 @@ if (emailConfig.provider !== 'none' && formId === 'contact-form') {
 }
 ```
 
-### Custom Email Templates
+### System Token Filtering & Sanitization
 
-To customize the email template, edit `src/email.ts`:
+By default, FormFlare automatically strips system and verification tokens (`cf-turnstile-response`, `turnstileToken`, `cf_turnstile_response`, `g-recaptcha-response`, `formId`, `siteId`) before passing form inputs to the template engine. This ensures your inbox receives clean user submission data without system clutter.
 
-```typescript
-function generateEmailHTML(submission: FormSubmissionData): string {
-  // Customize the HTML template here
-  return `
-    <!DOCTYPE html>
-    <html>
-    <!-- Your custom template -->
-    </html>
-  `;
-}
+### Customizing Mustache Email Templates
+
+FormFlare uses **Mustache** logic-less template files for email generation. Non-developers and designers can directly edit standard HTML and plain text template files without touching TypeScript code:
+
+* **HTML Template File**: [`src/templates/email.html.mustache`](file:///Users/bmo/code/websites/formflare/src/templates/email.html.mustache)
+* **Plaintext Template File**: [`src/templates/email.text.mustache`](file:///Users/bmo/code/websites/formflare/src/templates/email.text.mustache)
+
+#### Available Mustache Variables
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `{{formId}}` | Form identifier | `contact-form` |
+| `{{submissionId}}` | Unique submission ID | `sub_123456789` |
+| `{{timestamp}}` | UTC submission timestamp | `Tue, 19 Aug 2026 00:27:00 GMT` |
+| `{{ip}}` | Client IP address | `192.168.1.1` |
+| `{{#turnstileScore}}...{{/turnstileScore}}` | Conditional spam score block | `0.95` |
+| `{{#fields}} {{key}} : {{value}} {{/fields}}` | Sanitized array of user form fields | `[ { key: "name", value: "Jane" } ]` |
+
+#### HTML Mustache Template Example (`src/templates/email.html.mustache`)
+
+```mustache
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>New Form Submission</title>
+</head>
+<body style="font-family: sans-serif; background-color: #f4f6f9; padding: 20px;">
+  <h1>🎉 New Form Submission</h1>
+  <p>Form ID: <strong>{{formId}}</strong></p>
+  <p>
+    <strong>Submission ID:</strong> {{submissionId}}<br>
+    <strong>Timestamp:</strong> {{timestamp}}<br>
+    <strong>IP Address:</strong> {{ip}}
+    {{#turnstileScore}}<br><strong>Spam Score:</strong> {{turnstileScore}}{{/turnstileScore}}
+  </p>
+
+  <h2>Submission Details</h2>
+  <table width="100%" border="1" cellpadding="8" cellspacing="0">
+    {{#fields}}
+    <tr>
+      <td><strong>{{key}}</strong></td>
+      <td>{{value}}</td>
+    </tr>
+    {{/fields}}
+    {{^fields}}
+    <tr><td>No form data provided</td></tr>
+    {{/fields}}
+  </table>
+</body>
+</html>
+```
+
+#### Plaintext Mustache Template Example (`src/templates/email.text.mustache`)
+
+```mustache
+New Form Submission
+===================
+
+Form ID: {{formId}}
+Submission ID: {{submissionId}}
+Timestamp: {{timestamp}}
+IP Address: {{ip}}
+{{#turnstileScore}}Spam Score: {{turnstileScore}}{{/turnstileScore}}
+
+Submission Details
+------------------
+{{#fields}}
+• {{key}}: {{value}}
+{{/fields}}
+{{^fields}}
+(No form data provided)
+{{/fields}}
 ```
 
 ### Multiple Recipients Per Form

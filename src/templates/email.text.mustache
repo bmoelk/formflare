@@ -1,0 +1,20 @@
+New Form Submission
+===================
+
+Form ID: {{formId}}
+Submission ID: {{submissionId}}
+Timestamp: {{timestamp}}
+IP Address: {{ip}}
+{{#turnstileScore}}Spam Score: {{turnstileScore}}{{/turnstileScore}}
+
+Submission Details
+------------------
+{{#fields}}
+• {{key}}: {{value}}
+{{/fields}}
+{{^fields}}
+(No form data provided)
+{{/fields}}
+
+------------------------------------------------
+Sent by FormFlare Edge Engine • Powered by Cloudflare Workers

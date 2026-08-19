@@ -85,7 +85,7 @@ app.post('/submit', async (c) => {
         }
 
         const body = await c.req.json();
-        const { turnstileToken, formId, data } = body;
+        const { turnstileToken, formId, siteId, data } = body;
 
         // Validate required fields
         if (!turnstileToken) {
@@ -114,10 +114,19 @@ app.post('/submit', async (c) => {
             c.env.DEV_MODE === 'true' ||
             c.env.ENVIRONMENT === 'development';
 
+        // Dynamic Turnstile Secret Key resolution:
+        // 1. Explicit siteId: e.g. siteId: "brainendeavor" -> TURNSTILE_SECRET_KEY_BRAINENDEAVOR
+        // 2. Global fallback: TURNSTILE_SECRET_KEY
+        const cleanSiteId = siteId ? String(siteId).replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : '';
+        const siteKeyName = cleanSiteId ? `TURNSTILE_SECRET_KEY_${cleanSiteId}` : '';
+        const secretKey =
+            (siteKeyName && (c.env as Record<string, string | undefined>)[siteKeyName]) ||
+            c.env.TURNSTILE_SECRET_KEY || '';
+
         // Verify Turnstile token
         const turnstileResult = await verifyTurnstile(
             turnstileToken,
-            c.env.TURNSTILE_SECRET_KEY || '',
+            secretKey,
             clientIP,
             isDevMock
         );
@@ -173,8 +182,13 @@ app.post('/submit', async (c) => {
         }
 
         // Send webhook (if configured)
-        if (c.env.WEBHOOK_URL) {
-            const webhookPromise = fetch(c.env.WEBHOOK_URL, {
+        const siteWebhookName = cleanSiteId ? `WEBHOOK_URL_${cleanSiteId}` : '';
+        const webhookUrl =
+            (siteWebhookName && (c.env as Record<string, string | undefined>)[siteWebhookName]) ||
+            c.env.WEBHOOK_URL;
+
+        if (webhookUrl) {
+            const webhookPromise = fetch(webhookUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -18,6 +18,7 @@
     const FormFlare = {
         config: {
             workerUrl: '',
+            siteId: '',
             turnstileSiteKey: null,
             autoInit: true,
             debug: false
@@ -176,6 +177,9 @@
                     return;
                 }
 
+                // Resolve siteId from dataset attribute or global config
+                const siteId = form.dataset.formflareSite || form.dataset.siteId || this.config.siteId || '';
+
                 // Submit to FormFlare
                 const response = await fetch(`${this.config.workerUrl}/submit`, {
                     method: 'POST',
@@ -184,6 +188,7 @@
                     },
                     body: JSON.stringify({
                         formId: formId,
+                        siteId: siteId,
                         turnstileToken: turnstileToken,
                         data: data,
                     }),

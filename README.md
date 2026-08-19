@@ -10,10 +10,11 @@ FormFlare provides a complete, edge-native backend for collecting form submissio
 
 * 🛡️ **Turnstile Integration** — Built-in spam protection using Cloudflare Turnstile (with local dev auto-mocking).
 * 💾 **Flexible Storage** — Choose between Cloudflare KV (key-value) or D1 (SQLite SQL) databases.
+* 🔗 **Webhooks & Real-time Dispatch** — Trigger HTTP POST webhooks on form submissions with global (`WEBHOOK_URL`) and per-site (`WEBHOOK_URL_${SITE_ID}`) routing.
 * 🛠️ **Interactive Setup Wizard** — Run `npm run setup` for guided configuration and clear manifest summaries.
 * 🔒 **Zero-Secrets Security Architecture** — 100% safe for public Git repositories; no credentials in `wrangler.toml`.
 * 🔍 **Pre-Commit Security Scanner** — Automated scanner (`npm run scan-secrets`) to block staged credential leaks.
-* 📧 **Multi-Provider Email Alerts** — Outbound email notifications via Resend, SendGrid, Mailgun, Mailtrap, or local stdout console logger (`EMAIL_PROVIDER=console`).
+* 📧 **Multi-Provider Email Alerts & Mustache Templates** — Outbound email notifications with customizable Mustache templates (`src/templates/email.html.mustache`) via Resend, SendGrid, Mailgun, Mailtrap, or local console logger (`EMAIL_PROVIDER=console`).
 * ⚡ **Edge Performance** — Sub-50ms global response times on Cloudflare's edge network.
 
 ---
@@ -171,6 +172,45 @@ For complete custom control, you can post directly to the `/submit` endpoint:
 </body>
 </html>
 ```
+
+---
+
+## 🔗 Webhook Notifications
+
+FormFlare can dispatch HTTP POST requests to webhooks whenever a valid form submission is received.
+
+### 1. Configuration & Secret Keys
+
+Set webhooks globally or per-site using Wrangler secrets or `.dev.vars`:
+
+```bash
+# Global fallback webhook
+npx wrangler secret put WEBHOOK_URL
+
+# Per-site webhook URL (e.g. siteId: "brainendeavor")
+npx wrangler secret put WEBHOOK_URL_BRAINENDEAVOR
+```
+
+### 2. Webhook JSON Payload
+
+```json
+{
+  "id": "sub_123456789",
+  "formId": "contact",
+  "siteId": "brainendeavor",
+  "data": {
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "message": "Hello from static site!"
+  },
+  "timestamp": "2026-08-18T21:58:00.000Z"
+}
+```
+
+### 3. Headers Sent
+* `Content-Type`: `application/json`
+* `X-FormFlare-Event`: `submission`
+* `X-FormFlare-Signature`: `API_KEY` (if `API_KEY` secret is configured)
 
 ---
 

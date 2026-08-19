@@ -120,20 +120,34 @@ npm run deploy
 
 3. Upload `examples/example.html` to your static hosting (GitHub Pages, Netlify, etc.)
 
-## Step 8: Configure CORS (Optional)
+## Step 8: Environment Variables & Secrets Reference List
 
-For production, you should restrict which domains can submit forms:
+All configuration parameters and secrets supported by FormFlare are summarized below. You can specify non-sensitive environment variables in `.dev.vars` (or Cloudflare Dashboard), and sensitive secrets via `npx wrangler secret put KEY_NAME`.
 
-1. Edit `wrangler.toml`:
-```toml
-[vars]
-ALLOWED_ORIGINS = "https://yourdomain.com,https://www.yourdomain.com"
-```
+| Variable / Secret Name | Kind | Required? | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `ENVIRONMENT` | Var | Optional | `production` | Deployment mode (`development` / `production`). |
+| `ALLOWED_ORIGINS` | Var | Optional | `*` | Comma-separated list of allowed CORS origins (e.g. `https://example.com,https://staging.example.com`). |
+| `RATE_LIMIT_ENABLED` | Var | Optional | `false` | Enable/disable IP rate limiting (`true` / `false`). |
+| `RATE_LIMIT_REQUESTS` | Var | Optional | `10` | Max requests allowed per rate limit window per IP. |
+| `RATE_LIMIT_WINDOW` | Var | Optional | `60` | Duration of rate limit window in seconds. |
+| `EMAIL_PROVIDER` | Var | Optional | `none` | Outbound email provider (`none`, `console`, `resend`, `sendgrid`, `mailgun`, `mailtrap`). |
+| `EMAIL_FROM` | Var/Secret | Required if email enabled | - | Outbound "From" email address (e.g. `contact@yourdomain.com`). |
+| `EMAIL_TO` | Var/Secret | Required if email enabled | - | Target notification recipient email address (e.g. `alerts@yourdomain.com`). |
+| `EMAIL_API_KEY` | Secret | Required if email != none/console | - | API key for Resend, SendGrid, Mailgun, or Mailtrap. |
+| `TURNSTILE_SECRET_KEY` | Secret | Required for Turnstile | - | Global default Cloudflare Turnstile secret key. |
+| `TURNSTILE_SECRET_KEY_${SITE_ID}` | Secret | Optional (Per-site) | - | Per-site Turnstile secret key (e.g. `TURNSTILE_SECRET_KEY_BRAINENDEAVOR`). |
+| `API_KEY` | Secret | Optional | - | Bearer API token for admin GET endpoints (`/submissions`, `/submission/:id`). |
+| `WEBHOOK_URL` | Var/Secret | Optional | - | Global fallback webhook POST URL triggered on submission events. |
+| `WEBHOOK_URL_${SITE_ID}` | Var/Secret | Optional (Per-site) | - | Per-site webhook POST URL (e.g. `WEBHOOK_URL_BRAINENDEAVOR`). |
+| `MAILGUN_DOMAIN` | Var/Secret | Optional (Mailgun) | - | Mailgun sending domain. |
+| `MAILTRAP_INBOX_ID` | Var/Secret | Optional (Mailtrap) | - | Mailtrap inbox identifier. |
 
-2. Redeploy:
-```bash
-npm run deploy
-```
+### Configuration Storage Rules
+
+1. **`.dev.vars` (Git Ignored)**: Recommended for local dev and local deployment overrides (`ALLOWED_ORIGINS`, `EMAIL_PROVIDER`, `EMAIL_TO`).
+2. **Wrangler KMS Secrets (`npx wrangler secret put`)**: Required for sensitive secrets (`TURNSTILE_SECRET_KEY_*`, `EMAIL_API_KEY`, `API_KEY`).
+3. **`wrangler.toml`**: Public open-source template defaults only. Never put private email addresses or API keys in `wrangler.toml`.
 
 ## Step 9: Set Up Authentication for Admin Endpoints
 
