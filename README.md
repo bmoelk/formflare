@@ -23,14 +23,11 @@ FormFlare provides a complete, edge-native backend for collecting form submissio
 
 All detailed guides and architecture references are maintained in the [`docs/`](docs/) directory:
 
-* 📖 **[SECURITY_AND_DX.md](docs/SECURITY_AND_DX.md)** — Security architecture, secrets rulebook, setup wizard, & pre-commit scanner.
-* 📡 **[API_ENDPOINTS.md](docs/API_ENDPOINTS.md)** — Complete REST API specification, headers, and payload samples.
-* 📋 **[SETUP.md](docs/SETUP.md)** — Step-by-step setup and deployment guide.
-* 📑 **[PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)** — Comprehensive architecture and project overview.
-* ⚡ **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** — API endpoints, payloads, and quick commands.
-* ✉️ **[EMAIL_NOTIFICATIONS.md](docs/EMAIL_NOTIFICATIONS.md)** — Provider setup (Resend, SendGrid, Mailgun, Mailtrap, Console).
-* 🌐 **[MULTIPLE_SITES.md](docs/MULTIPLE_SITES.md)** — Supporting multiple client domains and forms.
-* 💻 **[CLIENT_LIBRARY.md](docs/CLIENT_LIBRARY.md)** — Client JavaScript library reference.
+* 📋 **[SETUP.md](docs/SETUP.md)** — Step-by-step setup, storage options, and auto-generated environment variables reference.
+* 📡 **[API_ENDPOINTS.md](docs/API_ENDPOINTS.md)** — Complete REST API endpoints specification, diagnostic status, and error codes.
+* 💻 **[CLIENT_INTEGRATION.md](docs/CLIENT_INTEGRATION.md)** — Frontend integration guide (Vanilla HTML/JS, FormFlare Client Library, Multi-Tenant `data-` attributes).
+* 📧 **[EMAIL_AND_WEBHOOKS.md](docs/EMAIL_AND_WEBHOOKS.md)** — Outbound email providers, Mustache template customization, and Webhook dispatching.
+* 🔒 **[AGENTS.md](AGENTS.md)** — Developer & AI agent zero-secrets policy and coding standards.
 
 ---
 

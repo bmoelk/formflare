@@ -14,8 +14,16 @@ This file defines coding standards, repository policies, and security guardrails
 >    - `wrangler.toml` must contain only non-sensitive default placeholders (`ALLOWED_ORIGINS = "*"`, `EMAIL_PROVIDER = "none"`).
 > 
 > 2. **Environment Variable & Secret Overrides**:
->    - Local dev and deployment environment overrides belong in `.dev.vars` (which is listed in `.gitignore` and never committed).
->    - Production secrets (API keys, Turnstile secret keys) must be set via `npx wrangler secret put KEY_NAME` or the Cloudflare Dashboard KMS.
+>    - Local dev and offline testing overrides belong in `.dev.vars` (git-ignored).
+>    - Production secrets (API keys, Turnstile secret keys) must be set via `npx wrangler secret put KEY_NAME` or Cloudflare Dashboard KMS.
+> 
+> 3. **Private Production Deployments (`wrangler.overrides.toml`)**:
+>    - Account-specific production bindings (e.g. `FORM_SUBMISSIONS` KV namespace ID, private `ALLOWED_ORIGINS`, and production `EMAIL_TO`) MUST be specified in `wrangler.overrides.toml` (git-ignored).
+>    - Deploy to your private account using:
+>      ```bash
+>      npx wrangler deploy -c wrangler.overrides.toml
+>      ```
+>    - Never modify tracked `wrangler.toml` with personal/account values.
 
 ---
 
@@ -27,7 +35,11 @@ This file defines coding standards, repository policies, and security guardrails
    - `c.env[`TURNSTILE_SECRET_KEY_${SITE_ID}`]` (e.g. `siteId: "mysite"` -> `TURNSTILE_SECRET_KEY_MYSITE`).
    - Fallback to `c.env.TURNSTILE_SECRET_KEY`.
    - Do NOT infer or split site prefixes from `formId`.
-3. **Webhook URL Resolution**:
+3. **Email Routing Resolution**:
+   - Recipient: `c.env[`EMAIL_TO_${SITE_ID}`]` -> Fallback: `c.env.EMAIL_TO`.
+   - Sender: `c.env[`EMAIL_FROM_${SITE_ID}`]` -> Fallback: `c.env.EMAIL_FROM`.
+   - Provider: `c.env[`EMAIL_PROVIDER_${SITE_ID}`]` -> Fallback: `c.env.EMAIL_PROVIDER`.
+4. **Webhook URL Resolution**:
    - `c.env[`WEBHOOK_URL_${SITE_ID}`]` (e.g. `siteId: "mysite"` -> `WEBHOOK_URL_MYSITE`).
    - Fallback to `c.env.WEBHOOK_URL`.
 
@@ -40,9 +52,41 @@ This file defines coding standards, repository policies, and security guardrails
 
 ---
 
-## 🧪 Security & Pre-Commit Scanner
+## 🧪 Pre-Commit Quality Gate & Security Scanner
 
-Before pushing any changes, run the security scanner:
+Before creating any git commits, FormFlare runs an automated quality gate (`npm run pre-commit` / `bash scripts/scan-secrets.sh`). Commits are automatically blocked if any of the following 4 checks fail:
+
+1. **Documentation & Manifest Sync Check (`scripts/sync-docs.js --check`)**:
+   - Verifies that the reference table in `docs/SETUP.md` matches `config-manifest.json` exactly.
+   - *Fix*: Run `npm run sync-docs` to re-sync documentation.
+2. **Private File Staging Check**:
+   - Blocks accidental staging of `.dev.vars`, `wrangler.overrides.toml`, or `wrangler.local.toml`.
+   - *Fix*: Run `git reset HEAD <file>` to unstage.
+3. **Hardcoded Secrets & API Token Scanner**:
+   - Scans all staged code diffs for secret key signatures (Turnstile `0x4...`, Stripe `sk_live_...`, generic API keys `key-...`).
+   - *Fix*: Move sensitive credentials to Cloudflare KMS via `npx wrangler secret put`.
+4. **Public `wrangler.toml` Sanitization**:
+   - Ensures `wrangler.toml` contains no personal email addresses (`user@...`) or hardcoded custom domain route patterns (`pattern = "..."`, `custom_domain = true`).
+   - *Fix*: Move custom routes and private configurations to `wrangler.overrides.toml`.
+
 ```bash
-npm run scan-secrets
+# Run manual pre-commit check
+npm run pre-commit
+```
+
+---
+
+## 🚀 Post-Deployment Verification & Key Cross-Referencing
+
+After running deployments (`npm run deploy:prod` / `npx wrangler deploy -c wrangler.overrides.toml`), FormFlare runs `scripts/verify-deploy.js` to execute live health checks:
+
+1. **Live Binding Diagnostics (`GET /`)**: Verifies KV/D1 storage, email provider, and Turnstile secrets on the remote Worker isolate.
+2. **Local vs. Remote Key Cross-Referencing**:
+   - Parses local `.dev.vars` and `wrangler.overrides.toml` to extract all tested configuration keys (`TURNSTILE_SECRET_KEY_${SITE_ID}`, `EMAIL_TO_${SITE_ID}`, `WEBHOOK_URL_${SITE_ID}`).
+   - Cross-references against `configuredKeys` from the remote Worker's `GET /` diagnostic payload.
+   - Flags any key tested locally that has not yet been set in Cloudflare (`npx wrangler secret put KEY_NAME`).
+
+```bash
+# Run manual post-deployment verification
+npm run verify-deploy
 ```

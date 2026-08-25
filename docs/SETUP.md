@@ -124,24 +124,31 @@ npm run deploy
 
 All configuration parameters and secrets supported by FormFlare are summarized below. You can specify non-sensitive environment variables in `.dev.vars` (or Cloudflare Dashboard), and sensitive secrets via `npx wrangler secret put KEY_NAME`.
 
+<!-- CONFIG_TABLE_START -->
+
 | Variable / Secret Name | Kind | Required? | Default | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `ENVIRONMENT` | Var | Optional | `production` | Deployment mode (`development` / `production`). |
-| `ALLOWED_ORIGINS` | Var | Optional | `*` | Comma-separated list of allowed CORS origins (e.g. `https://example.com,https://staging.example.com`). |
-| `RATE_LIMIT_ENABLED` | Var | Optional | `false` | Enable/disable IP rate limiting (`true` / `false`). |
+| `ENVIRONMENT` | Var | Optional | `production` | Deployment mode (development / production). |
+| `ALLOWED_ORIGINS` | Var | Optional | `*` | Comma-separated list of allowed CORS origins (e.g. https://example.com,https://staging.example.com). |
+| `RATE_LIMIT_ENABLED` | Var | Optional | `false` | Enable/disable IP rate limiting (true / false). |
 | `RATE_LIMIT_REQUESTS` | Var | Optional | `10` | Max requests allowed per rate limit window per IP. |
 | `RATE_LIMIT_WINDOW` | Var | Optional | `60` | Duration of rate limit window in seconds. |
-| `EMAIL_PROVIDER` | Var | Optional | `none` | Outbound email provider (`none`, `console`, `resend`, `sendgrid`, `mailgun`, `mailtrap`). |
-| `EMAIL_FROM` | Var/Secret | Required if email enabled | - | Outbound "From" email address (e.g. `contact@yourdomain.com`). |
-| `EMAIL_TO` | Var/Secret | Required if email enabled | - | Target notification recipient email address (e.g. `alerts@yourdomain.com`). |
-| `EMAIL_API_KEY` | Secret | Required if email != none/console | - | API key for Resend, SendGrid, Mailgun, or Mailtrap. |
-| `TURNSTILE_SECRET_KEY` | Secret | Required for Turnstile | - | Global default Cloudflare Turnstile secret key. |
-| `TURNSTILE_SECRET_KEY_${SITE_ID}` | Secret | Optional (Per-site) | - | Per-site Turnstile secret key (e.g. `TURNSTILE_SECRET_KEY_BRAINENDEAVOR`). |
-| `API_KEY` | Secret | Optional | - | Bearer API token for admin GET endpoints (`/submissions`, `/submission/:id`). |
+| `EMAIL_PROVIDER` | Var | Optional | `none` | Outbound email provider (none, console, mailtrap, resend, sendgrid, mailgun). |
+| `EMAIL_FROM` | Var/Secret | Required (EMAIL_PROVIDER is not 'none' or 'console') | `noreply@splitphase.io` | Outbound 'From' email address (e.g. contact@yourdomain.com). |
+| `EMAIL_TO` | Var/Secret | Required (EMAIL_PROVIDER is not 'none') | - | Target notification recipient email address (e.g. alerts@yourdomain.com). |
+| `EMAIL_API_KEY` | Secret | Required (EMAIL_PROVIDER is not 'none' or 'console') | - | API key for Mailtrap, Resend, SendGrid, or Mailgun. |
+| `EMAIL_TO_${SITE_ID}` | Var/Secret | Optional | - | Per-site notification recipient email override (e.g. EMAIL_TO_BRAINENDEAVOR). |
+| `EMAIL_FROM_${SITE_ID}` | Var/Secret | Optional | - | Per-site 'From' email sender override (e.g. EMAIL_FROM_BRAINENDEAVOR). |
+| `EMAIL_PROVIDER_${SITE_ID}` | Var | Optional | - | Per-site email provider override (e.g. EMAIL_PROVIDER_BRAINENDEAVOR). |
+| `TURNSTILE_SECRET_KEY` | Secret | Yes | - | Global default Cloudflare Turnstile secret key. |
+| `TURNSTILE_SECRET_KEY_${SITE_ID}` | Secret | Optional | - | Per-site Turnstile secret key (e.g. TURNSTILE_SECRET_KEY_MYSITE). |
+| `API_KEY` | Secret | Optional | - | Bearer API token for admin GET endpoints (/submissions, /submission/:id, /email-test). |
 | `WEBHOOK_URL` | Var/Secret | Optional | - | Global fallback webhook POST URL triggered on submission events. |
-| `WEBHOOK_URL_${SITE_ID}` | Var/Secret | Optional (Per-site) | - | Per-site webhook POST URL (e.g. `WEBHOOK_URL_BRAINENDEAVOR`). |
-| `MAILGUN_DOMAIN` | Var/Secret | Optional (Mailgun) | - | Mailgun sending domain. |
-| `MAILTRAP_INBOX_ID` | Var/Secret | Optional (Mailtrap) | - | Mailtrap inbox identifier. |
+| `WEBHOOK_URL_${SITE_ID}` | Var/Secret | Optional | - | Per-site webhook POST URL (e.g. WEBHOOK_URL_MYSITE). |
+| `MAILGUN_DOMAIN` | Var/Secret | Required (EMAIL_PROVIDER is 'mailgun') | - | Mailgun sending domain (required when using Mailgun). |
+| `MAILTRAP_INBOX_ID` | Var/Secret | Required (Using Mailtrap Sandbox Testing Mode) | - | Mailtrap inbox identifier for sandbox testing mode. |
+
+<!-- CONFIG_TABLE_END -->
 
 ### Configuration Storage Rules
 
@@ -240,6 +247,35 @@ If successful, you will receive a response like:
 }
 ```
 And check the configured email inbox for the test message.
+
+## Pre-Commit Quality Gate & Security Scanner
+
+FormFlare includes an automated pre-commit quality gate (`npm run pre-commit` / `bash scripts/scan-secrets.sh`) that verifies staged files before committing:
+
+1. **Documentation & Manifest Sync (`npm run check-docs`)**: Verifies that the Environment Variables table above matches `config-manifest.json` exactly. Run `npm run sync-docs` to re-sync if drifted.
+2. **Private Configuration Files**: Prevents accidental staging of `.dev.vars`, `wrangler.overrides.toml`, or `wrangler.local.toml`.
+3. **Hardcoded Secrets Scanner**: Detects leaked API keys, Turnstile secret tokens, or private credentials in staged diffs.
+4. **Public `wrangler.toml` Sanitization**: Ensures `wrangler.toml` contains no personal email addresses or custom domain route patterns.
+
+```bash
+# Run the pre-commit quality gate manually
+npm run pre-commit
+```
+
+## Post-Deployment Verification & Key Cross-Referencing
+
+After deploying to Cloudflare (`npm run deploy:prod` / `npx wrangler deploy -c wrangler.overrides.toml`), FormFlare automatically runs `scripts/verify-deploy.js` to execute live health checks:
+
+1. **Live Binding Diagnostics (`GET /`)**: Queries the deployed Worker to verify that KV/D1 storage is active, Turnstile secrets are configured, and email providers are recognized.
+2. **Local vs. Remote Key Cross-Referencing**:
+   - Parses local `.dev.vars` and `wrangler.overrides.toml` to extract all tested configuration keys (`TURNSTILE_SECRET_KEY_${SITE_ID}`, `EMAIL_TO_${SITE_ID}`, `WEBHOOK_URL_${SITE_ID}`, etc.).
+   - Cross-references them against the remote Worker's active secret list (`configuredKeys`).
+   - If any variable or secret tested locally was not provisioned in Cloudflare, it outputs a warning with the exact `npx wrangler secret put KEY_NAME` command needed.
+
+```bash
+# Run post-deployment verification manually at any time
+npm run verify-deploy
+```
 
 ## Troubleshooting
 
