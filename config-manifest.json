@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FormFlare Configuration Manifest",
+  "description": "Single source of truth for all FormFlare environment variables, secrets, and bindings",
+  "version": "1.0.0",
+  "variables": [
+    {
+      "name": "ENVIRONMENT",
+      "kind": "Var",
+      "required": false,
+      "default": "production",
+      "description": "Deployment mode (development / production).",
+      "options": ["development", "production"]
+    },
+    {
+      "name": "ALLOWED_ORIGINS",
+      "kind": "Var",
+      "required": false,
+      "default": "*",
+      "description": "Comma-separated list of allowed CORS origins (e.g. https://example.com,https://staging.example.com)."
+    },
+    {
+      "name": "RATE_LIMIT_ENABLED",
+      "kind": "Var",
+      "required": false,
+      "default": "false",
+      "description": "Enable/disable IP rate limiting (true / false)."
+    },
+    {
+      "name": "RATE_LIMIT_REQUESTS",
+      "kind": "Var",
+      "required": false,
+      "default": "10",
+      "description": "Max requests allowed per rate limit window per IP."
+    },
+    {
+      "name": "RATE_LIMIT_WINDOW",
+      "kind": "Var",
+      "required": false,
+      "default": "60",
+      "description": "Duration of rate limit window in seconds."
+    },
+    {
+      "name": "EMAIL_PROVIDER",
+      "kind": "Var",
+      "required": false,
+      "default": "none",
+      "description": "Outbound email provider (none, console, mailtrap, resend, sendgrid, mailgun).",
+      "options": ["none", "console", "mailtrap", "resend", "sendgrid", "mailgun"]
+    },
+    {
+      "name": "EMAIL_FROM",
+      "kind": "Var/Secret",
+      "required": false,
+      "default": "noreply@splitphase.io",
+      "requiredIf": {
+        "condition": "EMAIL_PROVIDER is not 'none' or 'console'",
+        "rule": { "var": "EMAIL_PROVIDER", "notIn": ["none", "console"] }
+      },
+      "description": "Outbound 'From' email address (e.g. contact@yourdomain.com)."
+    },
+    {
+      "name": "EMAIL_TO",
+      "kind": "Var/Secret",
+      "required": false,
+      "requiredIf": {
+        "condition": "EMAIL_PROVIDER is not 'none'",
+        "rule": { "var": "EMAIL_PROVIDER", "notIn": ["none"] }
+      },
+      "description": "Target notification recipient email address (e.g. alerts@yourdomain.com)."
+    },
+    {
+      "name": "EMAIL_API_KEY",
+      "kind": "Secret",
+      "required": false,
+      "requiredIf": {
+        "condition": "EMAIL_PROVIDER is not 'none' or 'console'",
+        "rule": { "var": "EMAIL_PROVIDER", "notIn": ["none", "console"] }
+      },
+      "description": "API key for Mailtrap, Resend, SendGrid, or Mailgun."
+    },
+    {
+      "name": "EMAIL_TO_${SITE_ID}",
+      "kind": "Var/Secret",
+      "required": false,
+      "description": "Per-site notification recipient email override (e.g. EMAIL_TO_BRAINENDEAVOR)."
+    },
+    {
+      "name": "EMAIL_FROM_${SITE_ID}",
+      "kind": "Var/Secret",
+      "required": false,
+      "description": "Per-site 'From' email sender override (e.g. EMAIL_FROM_BRAINENDEAVOR)."
+    },
+    {
+      "name": "EMAIL_PROVIDER_${SITE_ID}",
+      "kind": "Var",
+      "required": false,
+      "description": "Per-site email provider override (e.g. EMAIL_PROVIDER_BRAINENDEAVOR)."
+    },
+    {
+      "name": "TURNSTILE_SECRET_KEY",
+      "kind": "Secret",
+      "required": true,
+      "description": "Global default Cloudflare Turnstile secret key."
+    },
+    {
+      "name": "TURNSTILE_SECRET_KEY_${SITE_ID}",
+      "kind": "Secret",
+      "required": false,
+      "description": "Per-site Turnstile secret key (e.g. TURNSTILE_SECRET_KEY_MYSITE)."
+    },
+    {
+      "name": "API_KEY",
+      "kind": "Secret",
+      "required": false,
+      "description": "Bearer API token for admin GET endpoints (/submissions, /submission/:id, /email-test)."
+    },
+    {
+      "name": "WEBHOOK_URL",
+      "kind": "Var/Secret",
+      "required": false,
+      "description": "Global fallback webhook POST URL triggered on submission events."
+    },
+    {
+      "name": "WEBHOOK_URL_${SITE_ID}",
+      "kind": "Var/Secret",
+      "required": false,
+      "description": "Per-site webhook POST URL (e.g. WEBHOOK_URL_MYSITE)."
+    },
+    {
+      "name": "MAILGUN_DOMAIN",
+      "kind": "Var/Secret",
+      "required": false,
+      "requiredIf": {
+        "condition": "EMAIL_PROVIDER is 'mailgun'",
+        "rule": { "var": "EMAIL_PROVIDER", "equals": "mailgun" }
+      },
+      "description": "Mailgun sending domain (required when using Mailgun)."
+    },
+    {
+      "name": "MAILTRAP_INBOX_ID",
+      "kind": "Var/Secret",
+      "required": false,
+      "requiredIf": {
+        "condition": "Using Mailtrap Sandbox Testing Mode",
+        "rule": { "var": "EMAIL_PROVIDER", "equals": "mailtrap_sandbox" }
+      },
+      "description": "Mailtrap inbox identifier for sandbox testing mode."
+    }
+  ]
+}

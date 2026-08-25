@@ -5,11 +5,17 @@
     "main": "src/index.ts",
     "scripts": {
         "dev": "wrangler dev",
-        "deploy": "wrangler deploy",
+        "deploy": "wrangler deploy && node scripts/verify-deploy.js",
+        "deploy:prod": "wrangler deploy -c wrangler.overrides.toml && node scripts/verify-deploy.js",
+        "deploy:overrides": "wrangler deploy -c wrangler.overrides.toml && node scripts/verify-deploy.js",
+        "verify-deploy": "node scripts/verify-deploy.js",
         "tail": "wrangler tail",
         "test": "vitest",
         "setup": "node scripts/setup.js",
-        "scan-secrets": "bash scripts/scan-secrets.sh"
+        "sync-docs": "node scripts/sync-docs.js",
+        "check-docs": "node scripts/sync-docs.js --check",
+        "scan-secrets": "bash scripts/scan-secrets.sh",
+        "pre-commit": "bash scripts/scan-secrets.sh"
     },
     "keywords": [
         "cloudflare",

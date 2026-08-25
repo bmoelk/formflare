@@ -4,10 +4,16 @@
 
 ERRORS=0
 
-echo "🔍 Running FormFlare Dynamic Security Scan on staged files..."
+echo "🔍 Running FormFlare Pre-Commit Security & Docs Quality Gate..."
 
-# 1. Check if .dev.vars or wrangler.local.toml are accidentally staged
-STAGED_PRIVATE_FILES=$(git diff --cached --name-only | grep -E '^(\.dev\.vars|wrangler\.local\.toml)$')
+# 0. Check if documentation is in sync with config-manifest.json
+node scripts/sync-docs.js --check
+if [ $? -ne 0 ]; then
+    ERRORS=$((ERRORS+1))
+fi
+
+# 1. Check if .dev.vars or wrangler.overrides.toml are accidentally staged
+STAGED_PRIVATE_FILES=$(git diff --cached --name-only | grep -E '^(\.dev\.vars|wrangler\.overrides\.toml|wrangler\.local\.toml)$')
 if [ -n "$STAGED_PRIVATE_FILES" ]; then
     echo "❌ ERROR: Private configuration file(s) staged for commit:"
     echo "$STAGED_PRIVATE_FILES"
@@ -40,7 +46,7 @@ if git diff --cached --name-only | grep -q 'wrangler\.toml$'; then
     if [ -n "$ROUTE_LEAKS" ]; then
         echo "❌ ERROR: Hardcoded custom domain route configuration detected in public wrangler.toml:"
         echo "$ROUTE_LEAKS"
-        echo "💡 Move custom domain routes to Cloudflare Dashboard UI or untracked wrangler.local.toml."
+        echo "💡 Move custom domain routes to Cloudflare Dashboard UI or untracked wrangler.overrides.toml."
         ERRORS=$((ERRORS+1))
     fi
 fi
