@@ -64,7 +64,7 @@ export async function storeSubmission(
         const trimmedIndex = existingIndex.slice(0, 1000);
         await kv.put(indexKey, JSON.stringify(trimmedIndex));
     } else {
-        throw new Error('No storage backend configured');
+        console.warn('⚠️ No storage backend (KV or D1) bound. Submission processed without persistence.');
     }
 
     return submissionId;

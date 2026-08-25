@@ -6,6 +6,11 @@ compatibility_date = "2024-01-01"
 directory = "public"
 binding = "ASSETS"
 
+[[rules]]
+type = "Text"
+globs = ["**/*.mustache"]
+fallthrough = true
+
 # Public Non-Sensitive Configuration Defaults
 # ZERO secrets, private email addresses, or custom domain routes should be stored here!
 [vars]
@@ -20,7 +25,7 @@ RATE_LIMIT_WINDOW = "60"
 # Default Email Provider (options: none, console, resend, sendgrid, mailgun, mailtrap)
 EMAIL_PROVIDER = "none"
 
-# Infrastructure Bindings (Placeholders only - bound via Cloudflare Dashboard or wrangler.local.toml)
+# Infrastructure Bindings (Placeholders only - bound via Cloudflare Dashboard or wrangler.overrides.toml)
 # [[kv_namespaces]]
 # binding = "FORM_SUBMISSIONS"
 # id = "YOUR_KV_NAMESPACE_ID"
@@ -37,3 +42,19 @@ EMAIL_PROVIDER = "none"
 # - EMAIL_FROM (Required if EMAIL_PROVIDER != "none" or "console")
 # - EMAIL_TO (Required if EMAIL_PROVIDER != "none" or "console")
 # - WEBHOOK_URL (Optional webhook trigger)
+
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1

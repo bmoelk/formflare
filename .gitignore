@@ -2,5 +2,11 @@ node_modules
 dist
 .wrangler
 .dev.vars
+wrangler.overrides.toml
+*.overrides.toml
+wrangler.local.toml
+*.local.toml
+.env*
 *.log
 .DS_Store
+

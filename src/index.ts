@@ -44,12 +44,42 @@ app.use('/*', async (c, next) => {
     return corsMiddleware(c, next);
 });
 
-// Health check endpoint
+// Health check endpoint with safe configuration diagnostic status
 app.get('/', (c) => {
+    const knownPrefixes = [
+        'TURNSTILE_SECRET_KEY',
+        'EMAIL_TO',
+        'EMAIL_FROM',
+        'EMAIL_PROVIDER',
+        'EMAIL_API_KEY',
+        'WEBHOOK_URL',
+        'API_KEY',
+        'RATE_LIMIT_ENABLED',
+        'RATE_LIMIT_REQUESTS',
+        'RATE_LIMIT_WINDOW',
+        'ALLOWED_ORIGINS',
+        'ENVIRONMENT',
+    ];
+
+    const configuredKeys = Object.keys(c.env || {}).filter((key) =>
+        typeof (c.env as Record<string, any>)[key] === 'string' &&
+        knownPrefixes.some((prefix) => key === prefix || key.startsWith(`${prefix}_`))
+    );
+
     return c.json({
         service: 'FormFlare',
         version: '1.0.0',
         status: 'healthy',
+        environment: c.env.ENVIRONMENT || 'production',
+        config: {
+            storage: c.env.DB ? 'd1' : c.env.FORM_SUBMISSIONS ? 'kv' : 'none',
+            emailProvider: c.env.EMAIL_PROVIDER || 'none',
+            emailToConfigured: !!c.env.EMAIL_TO,
+            emailApiKeyConfigured: !!c.env.EMAIL_API_KEY,
+            turnstileConfigured: !!c.env.TURNSTILE_SECRET_KEY,
+            rateLimitEnabled: c.env.RATE_LIMIT_ENABLED === 'true',
+            configuredKeys,
+        },
         timestamp: new Date().toISOString(),
     });
 });
@@ -161,17 +191,27 @@ app.post('/submit', async (c) => {
             c.env.DB,
         );
 
+        // Dynamic Per-Site Email & Webhook Resolution:
+        const envRecord = c.env as Record<string, string | undefined>;
+        const siteEmailToKey = cleanSiteId ? `EMAIL_TO_${cleanSiteId}` : '';
+        const siteEmailFromKey = cleanSiteId ? `EMAIL_FROM_${cleanSiteId}` : '';
+        const siteEmailProviderKey = cleanSiteId ? `EMAIL_PROVIDER_${cleanSiteId}` : '';
+
+        const resolvedEmailTo = (siteEmailToKey && envRecord[siteEmailToKey]) || c.env.EMAIL_TO || '';
+        const resolvedEmailFrom = (siteEmailFromKey && envRecord[siteEmailFromKey]) || c.env.EMAIL_FROM || 'noreply@splitphase.io';
+        const resolvedEmailProvider = ((siteEmailProviderKey && envRecord[siteEmailProviderKey]) || c.env.EMAIL_PROVIDER || 'none').toLowerCase() as any;
+
         // Send email notification (if configured)
         const emailConfig: EmailConfig = {
-            provider: (c.env.EMAIL_PROVIDER?.toLowerCase() as any) || 'none',
+            provider: resolvedEmailProvider,
             apiKey: c.env.EMAIL_API_KEY || '',
-            from: c.env.EMAIL_FROM || '',
-            to: c.env.EMAIL_TO || '',
+            from: resolvedEmailFrom,
+            to: resolvedEmailTo,
             mailgunDomain: c.env.MAILGUN_DOMAIN,
             mailtrapInboxId: c.env.MAILTRAP_INBOX_ID,
         };
 
-        if (emailConfig.provider !== 'none') {
+        if (emailConfig.provider !== 'none' && emailConfig.to) {
             const emailPromise = sendEmailNotification(emailConfig, {
                 ...submissionData,
                 submissionId,
