@@ -28,6 +28,41 @@ type Bindings = {
     WEBHOOK_URL?: string;
 };
 
+export function getSiteEnvVariants(prefix: string, siteId: string): string[] {
+    const variants: string[] = [];
+    if (siteId) {
+        // 1. Full identifier with underscores (e.g. splitphase.io -> SPLITPHASE_IO)
+        const formatted = siteId.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase().replace(/_+/g, '_').replace(/^_|_$/g, '');
+        if (formatted) variants.push(`${prefix}_${formatted}`);
+
+        // 2. Alphanumeric only (e.g. splitphase.io -> SPLITPHASEIO)
+        const alphaNum = siteId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        if (alphaNum && !variants.includes(`${prefix}_${alphaNum}`)) {
+            variants.push(`${prefix}_${alphaNum}`);
+        }
+
+        // 3. Base domain before first dot (e.g. splitphase.io -> SPLITPHASE)
+        const baseDomain = siteId.split('.')[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        if (baseDomain && !variants.includes(`${prefix}_${baseDomain}`)) {
+            variants.push(`${prefix}_${baseDomain}`);
+        }
+    }
+    variants.push(prefix); // Global fallback
+    return variants;
+}
+
+export function resolveSiteEnv(
+    envRecord: Record<string, string | undefined>,
+    prefix: string,
+    siteId: string
+): string | undefined {
+    const keys = getSiteEnvVariants(prefix, siteId);
+    for (const key of keys) {
+        if (envRecord[key]) return envRecord[key];
+    }
+    return undefined;
+}
+
 const app = new Hono<{ Bindings: Bindings }>();
 
 // CORS middleware
@@ -153,6 +188,29 @@ app.post('/submit', async (c) => {
             );
         }
 
+        // Resolve siteId: explicit payload -> origin/referer URL domain fallback
+        let resolvedSiteId = (siteId && typeof siteId === 'string') ? siteId.trim().toLowerCase() : '';
+        if (!resolvedSiteId) {
+            const originOrReferer = c.req.header('origin') || c.req.header('referer');
+            if (originOrReferer) {
+                try {
+                    resolvedSiteId = new URL(originOrReferer).hostname.replace(/^www\./i, '').toLowerCase();
+                } catch {
+                    // Invalid URL format, ignore
+                }
+            }
+        }
+
+        if (!resolvedSiteId) {
+            return c.json(
+                {
+                    success: false,
+                    error: "Site ID is required. Please provide 'siteId' in the payload, specify 'data-formflare-site' on your form, or host on a recognized domain.",
+                },
+                400
+            );
+        }
+
         if (!data || typeof data !== 'object') {
             return c.json(
                 { success: false, error: 'Form data is required' },
@@ -165,14 +223,10 @@ app.post('/submit', async (c) => {
             c.env.DEV_MODE === 'true' ||
             c.env.ENVIRONMENT === 'development';
 
-        // Dynamic Turnstile Secret Key resolution:
-        // 1. Explicit siteId: e.g. siteId: "brainendeavor" -> TURNSTILE_SECRET_KEY_BRAINENDEAVOR
-        // 2. Global fallback: TURNSTILE_SECRET_KEY
-        const cleanSiteId = siteId ? String(siteId).replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : '';
-        const siteKeyName = cleanSiteId ? `TURNSTILE_SECRET_KEY_${cleanSiteId}` : '';
-        const secretKey =
-            (siteKeyName && (c.env as Record<string, string | undefined>)[siteKeyName]) ||
-            c.env.TURNSTILE_SECRET_KEY || '';
+        const envRecord = c.env as Record<string, string | undefined>;
+
+        // Dynamic Turnstile Secret Key resolution (supports domains, underscores, and global fallbacks):
+        const secretKey = resolveSiteEnv(envRecord, 'TURNSTILE_SECRET_KEY', resolvedSiteId) || '';
 
         // Verify Turnstile token
         const turnstileResult = await verifyTurnstile(
@@ -196,7 +250,7 @@ app.post('/submit', async (c) => {
         // Prepare submission data
         const submissionData = {
             formId,
-            siteId: siteId ? String(siteId) : undefined,
+            siteId: resolvedSiteId,
             data,
             metadata: {
                 ip: clientIP,
@@ -226,21 +280,13 @@ app.post('/submit', async (c) => {
             submissionId = await storeSubmission(submissionData, undefined, undefined);
         }
 
-        // Dynamic Per-Site Email & Webhook Resolution:
-        const envRecord = c.env as Record<string, string | undefined>;
-        const siteEmailToKey = cleanSiteId ? `EMAIL_TO_${cleanSiteId}` : '';
-        const siteEmailFromKey = cleanSiteId ? `EMAIL_FROM_${cleanSiteId}` : '';
-        const siteEmailProviderKey = cleanSiteId ? `EMAIL_PROVIDER_${cleanSiteId}` : '';
-        const siteEmailApiKeyKey = cleanSiteId ? `EMAIL_API_KEY_${cleanSiteId}` : '';
-        const siteMailgunDomainKey = cleanSiteId ? `MAILGUN_DOMAIN_${cleanSiteId}` : '';
-        const siteMailtrapInboxIdKey = cleanSiteId ? `MAILTRAP_INBOX_ID_${cleanSiteId}` : '';
-
-        const resolvedEmailTo = (siteEmailToKey && envRecord[siteEmailToKey]) || c.env.EMAIL_TO || '';
-        const resolvedEmailFrom = (siteEmailFromKey && envRecord[siteEmailFromKey]) || c.env.EMAIL_FROM || '';
-        const resolvedEmailProvider = ((siteEmailProviderKey && envRecord[siteEmailProviderKey]) || c.env.EMAIL_PROVIDER || 'none').toLowerCase() as any;
-        const resolvedEmailApiKey = (siteEmailApiKeyKey && envRecord[siteEmailApiKeyKey]) || c.env.EMAIL_API_KEY || '';
-        const resolvedMailgunDomain = (siteMailgunDomainKey && envRecord[siteMailgunDomainKey]) || c.env.MAILGUN_DOMAIN;
-        const resolvedMailtrapInboxId = (siteMailtrapInboxIdKey && envRecord[siteMailtrapInboxIdKey]) || c.env.MAILTRAP_INBOX_ID;
+        // Dynamic Per-Site Email & Webhook Resolution (supports domains, prefixes, and global fallbacks):
+        const resolvedEmailTo = resolveSiteEnv(envRecord, 'EMAIL_TO', resolvedSiteId) || '';
+        const resolvedEmailFrom = resolveSiteEnv(envRecord, 'EMAIL_FROM', resolvedSiteId) || '';
+        const resolvedEmailProvider = (resolveSiteEnv(envRecord, 'EMAIL_PROVIDER', resolvedSiteId) || 'none').toLowerCase() as any;
+        const resolvedEmailApiKey = resolveSiteEnv(envRecord, 'EMAIL_API_KEY', resolvedSiteId) || '';
+        const resolvedMailgunDomain = resolveSiteEnv(envRecord, 'MAILGUN_DOMAIN', resolvedSiteId);
+        const resolvedMailtrapInboxId = resolveSiteEnv(envRecord, 'MAILTRAP_INBOX_ID', resolvedSiteId);
 
         // Send email notification (if configured)
         const emailConfig: EmailConfig = {
@@ -250,6 +296,7 @@ app.post('/submit', async (c) => {
             to: resolvedEmailTo,
             mailgunDomain: resolvedMailgunDomain,
             mailtrapInboxId: resolvedMailtrapInboxId,
+            siteId: resolvedSiteId,
         };
 
         if (emailConfig.provider !== 'none') {
@@ -267,10 +314,7 @@ app.post('/submit', async (c) => {
         }
 
         // Send webhook (if configured)
-        const siteWebhookName = cleanSiteId ? `WEBHOOK_URL_${cleanSiteId}` : '';
-        const webhookUrl =
-            (siteWebhookName && (c.env as Record<string, string | undefined>)[siteWebhookName]) ||
-            c.env.WEBHOOK_URL;
+        const webhookUrl = resolveSiteEnv(envRecord, 'WEBHOOK_URL', resolvedSiteId);
 
         if (webhookUrl) {
             const webhookPromise = fetch(webhookUrl, {
@@ -327,7 +371,18 @@ app.get('/submissions/:formId', async (c) => {
 
         const formId = c.req.param('formId');
         const siteId = c.req.query('siteId');
-        const cleanSiteId = siteId ? String(siteId).replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : '';
+
+        if (!siteId || !siteId.trim()) {
+            return c.json(
+                {
+                    success: false,
+                    error: "Missing required 'siteId' query parameter (e.g. /submissions/:formId?siteId=mysite)",
+                },
+                400
+            );
+        }
+
+        const cleanSite = siteId.trim().toLowerCase();
         const limit = parseInt(c.req.query('limit') || '100');
         const offset = parseInt(c.req.query('offset') || '0');
 
@@ -338,7 +393,7 @@ app.get('/submissions/:formId', async (c) => {
             storageEngine === 'kv' ? c.env.KV : undefined,
             storageEngine === 'd1' ? c.env.DB : undefined,
             formId,
-            siteId,
+            cleanSite,
             limit,
             offset
         );
@@ -346,7 +401,7 @@ app.get('/submissions/:formId', async (c) => {
         return c.json({
             success: true,
             formId,
-            siteId: siteId || 'default',
+            siteId: cleanSite,
             storageEngine,
             submissions,
             pagination: {

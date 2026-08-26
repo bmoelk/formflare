@@ -1,6 +1,6 @@
 # FormFlare Client Integration Guide 💻
 
-This guide covers integrating FormFlare with your frontend websites, whether you prefer vanilla HTML/JavaScript or the built-in FormFlare client library.
+This guide covers integrating FormFlare with your frontend websites—from zero-config static HTML forms to single-page applications (React, Vue, Svelte, Astro).
 
 ---
 
@@ -18,7 +18,7 @@ The simplest way to submit a form to FormFlare without external dependencies:
   action="https://your-worker.workers.dev/submit"
   method="POST"
   data-formflare="contact"
-  data-formflare-site="mysite"
+  data-formflare-site="splitphase.io"
 >
   <input type="text" name="name" placeholder="Your Name" required />
   <input type="email" name="email" placeholder="Your Email" required />
@@ -46,13 +46,16 @@ The simplest way to submit a form to FormFlare without external dependencies:
     const data = Object.fromEntries(formData.entries());
     delete data['cf-turnstile-response']; // Keep payload clean
 
+    // Auto-extract domain if data-formflare-site is omitted
+    const siteId = form.dataset.formflareSite || window.location.hostname.replace(/^www\./i, '');
+
     try {
       const res = await fetch(form.action, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           formId: form.dataset.formflare || 'contact',
-          siteId: form.dataset.formflareSite,
+          siteId: siteId,
           turnstileToken: token,
           data,
         }),
@@ -65,9 +68,11 @@ The simplest way to submit a form to FormFlare without external dependencies:
         turnstile.reset();
       } else {
         alert('Error: ' + (result.error || 'Failed to submit'));
+        turnstile.reset();
       }
     } catch (err) {
       alert('Network error. Please try again.');
+      turnstile.reset();
     }
   });
 </script>
@@ -77,11 +82,11 @@ The simplest way to submit a form to FormFlare without external dependencies:
 
 ## 2. Using the FormFlare Client Library (`/form-handler.js`)
 
-FormFlare includes a lightweight (under 2KB) drop-in client library served directly from your Worker.
+FormFlare serves a lightweight (under 2KB) drop-in client library directly from your Worker.
 
-### Automatic Initialization via HTML Data Attributes
+### Option A: Automatic Initialization via HTML Data Attributes
 
-Add `data-formflare` to any form, and the library automatically handles Turnstile token extraction, validation, and submission states:
+Simply tag any form with `data-formflare`, and the library automatically handles Turnstile token extraction, submission lifecycle, and UI feedback states:
 
 ```html
 <!-- Include Turnstile and FormFlare scripts -->
@@ -92,46 +97,81 @@ Add `data-formflare` to any form, and the library automatically handles Turnstil
   action="https://your-worker.workers.dev/submit"
   method="POST"
   data-formflare="contact-form"
-  data-formflare-site="mysite"
-  data-success-message="Thank you! Your message has been sent."
+  data-formflare-site="splitphase.io"
 >
-  <input type="text" name="name" required />
-  <input type="email" name="email" required />
-  <textarea name="message" required></textarea>
+  <input type="text" name="name" placeholder="Your Name" required />
+  <input type="email" name="email" placeholder="Your Email" required />
+  <textarea name="message" placeholder="Your Message" required></textarea>
 
-  <div class="cf-turnstile" data-sitekey="YOUR_SITE_KEY"></div>
-  <button type="submit">Submit</button>
+  <div class="cf-turnstile" data-sitekey="YOUR_TURNSTILE_SITE_KEY"></div>
+  <button type="submit">Send Message</button>
 </form>
 ```
 
-### Supported Form Data Attributes
+### Option B: Programmatic Initialization via JavaScript
 
-| Attribute | Description | Example |
-| :--- | :--- | :--- |
-| `data-formflare` | Unique form identifier | `data-formflare="contact"` |
-| `data-formflare-site` | Optional site ID for multi-tenant Turnstile/webhook routing | `data-formflare-site="mysite"` |
-| `data-success-message` | Custom message displayed on submission success | `data-success-message="Received!"` |
-| `data-redirect` | URL to redirect user to on success | `data-redirect="/thank-you"` |
+```javascript
+FormFlare.init({
+  workerUrl: 'https://your-worker.workers.dev',
+  siteId: 'splitphase.io', // Optional: defaults to window.location.hostname
+  turnstileSiteKey: 'YOUR_TURNSTILE_SITE_KEY', // Automatically creates Turnstile widget if omitted in HTML
+  autoInit: true,
+  debug: false
+});
+
+// Listen for custom lifecycle events
+const form = document.getElementById('contact-form');
+
+form.addEventListener('formflare:success', (e) => {
+  console.log('Submission ID:', e.detail.submissionId);
+  // e.g., redirect to /thank-you or trigger analytics event
+});
+
+form.addEventListener('formflare:error', (e) => {
+  console.error('Submission failed:', e.detail.error);
+});
+```
 
 ---
 
-## 3. Multi-Tenant Architecture & Site Routing
+## 3. Supported Form Attributes
 
-FormFlare supports managing multiple distinct websites from a single worker deployment without cross-talk:
+| Attribute | Description | Example |
+| :--- | :--- | :--- |
+| `data-formflare` | Unique form identifier *(Required)* | `data-formflare="contact-form"` |
+| `data-formflare-site` | Site ID or domain name. If omitted, automatically extracts current webpage hostname. | `data-formflare-site="splitphase.io"` |
+| `data-success-message` | Custom success message displayed above form | `data-success-message="Thank you! We'll reply shortly."` |
+| `data-redirect` | Optional URL redirect upon successful submission | `data-redirect="/thank-you"` |
 
-1. **Tag Forms with `data-formflare-site`**:
-   ```html
-   <!-- Site A Form -->
-   <form data-formflare="contact" data-formflare-site="mysite_a">...</form>
+---
 
-   <!-- Site B Form -->
-   <form data-formflare="contact" data-formflare-site="mysite_b">...</form>
-   ```
+## 4. Multi-Tenant Architecture & Domain Resolution
 
-2. **Backend Resolution**:
-   * **Turnstile Secret**: Looks for `TURNSTILE_SECRET_KEY_${SITE_ID}` (e.g. `TURNSTILE_SECRET_KEY_MYSITE_A`), falling back to `TURNSTILE_SECRET_KEY`.
-   * **Webhook URL**: Looks for `WEBHOOK_URL_${SITE_ID}` (e.g. `WEBHOOK_URL_MYSITE_A`), falling back to `WEBHOOK_URL`.
+FormFlare is designed to power multiple separate websites from a single Worker deployment with zero cross-talk.
 
-3. **Separation Rule**:
-   * System routing metadata (`formId`, `siteId`) is strictly specified via `<form>` dataset attributes or JS client config.
-   * Standard `<input type="hidden">` tags are reserved for user/business form payload data.
+### 1. Automatic Domain Extraction (Zero-Config)
+* **Client-Side**: If `data-formflare-site` is omitted, the client library automatically uses `window.location.hostname.replace(/^www\./i, '')` (e.g. `splitphase.io`).
+* **Server-Side**: If a direct submission omits `siteId`, the server extracts the domain from the HTTP `Origin` or `Referer` headers.
+
+### 2. Smart Secret & Variable Resolution
+When a form submits under a domain (e.g. `siteId = "splitphase.io"`), FormFlare automatically searches for secrets and routing variables using normalized fallbacks:
+
+```text
+siteId: "splitphase.io"
+  1. Exact with underscores:  TURNSTILE_SECRET_KEY_SPLITPHASE_IO
+  2. Alphanumeric only:       TURNSTILE_SECRET_KEY_SPLITPHASEIO
+  3. Base domain prefix:      TURNSTILE_SECRET_KEY_SPLITPHASE
+  4. Global fallback:         TURNSTILE_SECRET_KEY
+```
+
+This resolution order applies to:
+* **Turnstile Anti-Spam**: `TURNSTILE_SECRET_KEY_${SITE_ID}` $\rightarrow$ `TURNSTILE_SECRET_KEY`
+* **Email Recipient**: `EMAIL_TO_${SITE_ID}` $\rightarrow$ `EMAIL_TO`
+* **Email Sender**: `EMAIL_FROM_${SITE_ID}` $\rightarrow$ `EMAIL_FROM`
+* **Email Provider**: `EMAIL_PROVIDER_${SITE_ID}` $\rightarrow$ `EMAIL_PROVIDER`
+* **Email API Key**: `EMAIL_API_KEY_${SITE_ID}` $\rightarrow$ `EMAIL_API_KEY`
+* **Webhooks**: `WEBHOOK_URL_${SITE_ID}` $\rightarrow$ `WEBHOOK_URL`
+
+### 3. Separation of Form Data vs. System Metadata
+* **System Metadata** (`formId`, `siteId`, `turnstileToken`) must always be specified via `<form>` dataset attributes (`data-formflare`, `data-formflare-site`) or JS configuration—**never via hidden HTML `<input>` tags**.
+* **Form Payload Data**: Hidden HTML `<input>` tags inside forms are strictly preserved for user and business form payload data.

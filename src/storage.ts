@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid';
 
 export interface FormSubmission {
     formId: string;
-    siteId?: string;
+    siteId: string;
     data: Record<string, any>;
     metadata: {
         ip: string;
@@ -26,11 +26,10 @@ export async function storeSubmission(
     db?: D1Database,
 ): Promise<string> {
     const submissionId = nanoid();
-    const site = submission.siteId || 'default';
+    const site = submission.siteId;
     const storedSubmission: StoredSubmission = {
         id: submissionId,
         ...submission,
-        siteId: site,
     };
 
     // Prefer D1 if available, fallback to KV
@@ -76,29 +75,22 @@ export async function storeSubmission(
 }
 
 /**
- * Get submissions for a specific form and optional site
+ * Get submissions for a specific form and site
  */
 export async function getSubmissions(
     kv: KVNamespace | undefined,
     db: D1Database | undefined,
     formId: string,
-    siteId?: string,
+    siteId: string,
     limit: number = 100,
     offset: number = 0
 ): Promise<StoredSubmission[]> {
     if (db) {
-        let query = `SELECT id, form_id, site_id, data, metadata, created_at
+        const query = `SELECT id, form_id, site_id, data, metadata, created_at
          FROM submissions
-         WHERE form_id = ?`;
-        const params: any[] = [formId];
-
-        if (siteId) {
-            query += ` AND site_id = ?`;
-            params.push(siteId);
-        }
-
-        query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-        params.push(limit, offset);
+         WHERE form_id = ? AND site_id = ?
+         ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+        const params: any[] = [formId, siteId, limit, offset];
 
         const result = await db.prepare(query).bind(...params).all();
 
@@ -110,19 +102,8 @@ export async function getSubmissions(
             metadata: JSON.parse(row.metadata),
         }));
     } else if (kv) {
-        const site = siteId || 'default';
-        let indexKey = `index:${site}:${formId}`;
-        let index = (await kv.get(indexKey, 'json')) as string[] | null;
-
-        // Fallback for legacy keys if no submissions found in site partition
-        if (!index || index.length === 0) {
-            const legacyIndexKey = `index:${formId}`;
-            const legacyIndex = (await kv.get(legacyIndexKey, 'json')) as string[] | null;
-            if (legacyIndex && legacyIndex.length > 0) {
-                index = legacyIndex;
-                indexKey = legacyIndexKey;
-            }
-        }
+        const indexKey = `index:${siteId}:${formId}`;
+        const index = (await kv.get(indexKey, 'json')) as string[] | null;
 
         if (!index) return [];
 
@@ -130,16 +111,8 @@ export async function getSubmissions(
         const submissions: StoredSubmission[] = [];
 
         for (const id of submissionIds) {
-            // Check hierarchical site key first
-            let key = `submission:${site}:${formId}:${id}`;
-            let submission = (await kv.get(key, 'json')) as StoredSubmission | null;
-
-            // Fallback check for legacy non-partitioned key
-            if (!submission) {
-                key = `submission:${formId}:${id}`;
-                submission = (await kv.get(key, 'json')) as StoredSubmission | null;
-            }
-
+            const key = `submission:${siteId}:${formId}:${id}`;
+            const submission = (await kv.get(key, 'json')) as StoredSubmission | null;
             if (submission) {
                 submissions.push(submission);
             }
@@ -188,19 +161,9 @@ export async function getSubmission(
             if (directSub) return directSub;
         }
 
-        // Fast path for default partition
-        if (formId) {
-            const defaultKey = `submission:default:${formId}:${submissionId}`;
-            const defaultSub = (await kv.get(defaultKey, 'json')) as StoredSubmission | null;
-            if (defaultSub) return defaultSub;
-
-            const legacyKey = `submission:${formId}:${submissionId}`;
-            const legacySub = (await kv.get(legacyKey, 'json')) as StoredSubmission | null;
-            if (legacySub) return legacySub;
-        }
-
-        // Fallback scan
-        const list = await kv.list({ prefix: 'submission:' });
+        // Fallback scan by prefix
+        const prefix = siteId ? `submission:${siteId}:` : 'submission:';
+        const list = await kv.list({ prefix });
         for (const key of list.keys) {
             if (key.name.endsWith(`:${submissionId}`)) {
                 const submission = (await kv.get(key.name, 'json')) as StoredSubmission;

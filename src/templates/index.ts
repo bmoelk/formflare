@@ -9,6 +9,7 @@ import textTemplate from './email.text.mustache';
 
 export interface EmailTemplateData {
   formId: string;
+  siteId?: string;
   submissionId: string;
   data: Record<string, any>;
   metadata: {
@@ -51,6 +52,7 @@ export function generateEmailHTML(submission: EmailTemplateData): string {
   const fields = sanitizeSubmissionData(submission.data);
   const context = {
     formId: submission.formId,
+    siteId: submission.siteId || null,
     submissionId: submission.submissionId,
     timestamp: new Date(submission.metadata.timestamp).toUTCString(),
     ip: submission.metadata.ip,
@@ -67,6 +69,7 @@ export function generateEmailTEXT(submission: EmailTemplateData): string {
   const fields = sanitizeSubmissionData(submission.data);
   const context = {
     formId: submission.formId,
+    siteId: submission.siteId || null,
     submissionId: submission.submissionId,
     timestamp: new Date(submission.metadata.timestamp).toUTCString(),
     ip: submission.metadata.ip,

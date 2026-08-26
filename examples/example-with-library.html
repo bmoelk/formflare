@@ -131,10 +131,10 @@
         <p class="subtitle">This form uses the FormFlare client library for easy integration.</p>
 
         <!-- 
-            The form has data-formflare attribute which automatically 
-            initializes it with the FormFlare library 
+            The form has data-formflare and data-formflare-site attributes 
+            which automatically initialize it with the FormFlare library 
         -->
-        <form id="contact-form" data-formflare="contact-form">
+        <form id="contact-form" data-formflare="contact-form" data-formflare-site="mysite">
             <div class="form-group">
                 <label for="name">Name <span class="required">*</span></label>
                 <input type="text" id="name" name="name" required placeholder="John Doe">
@@ -169,6 +169,7 @@
         // Initialize FormFlare with your configuration
         FormFlare.init({
             workerUrl: 'https://your-worker.workers.dev',
+            siteId: 'mysite',
             turnstileSiteKey: 'YOUR_TURNSTILE_SITE_KEY',
             autoInit: true,  // Automatically initialize forms with data-formflare attribute
             debug: true      // Enable debug logging (set to false in production)

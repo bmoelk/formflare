@@ -29,20 +29,20 @@ This file defines coding standards, repository policies, and security guardrails
 
 ## 🏗 Multi-Tenant Architecture: Per-Site Resolution
 
-1. **Explicit Site Identification**:
-   - Web clients pass an explicit `siteId` attribute (e.g. `data-formflare-site="mysite"` or JS `FormFlare.init({ siteId: 'mysite' })`).
-2. **Turnstile Secret Resolution**:
-   - `c.env[`TURNSTILE_SECRET_KEY_${SITE_ID}`]` (e.g. `siteId: "mysite"` -> `TURNSTILE_SECRET_KEY_MYSITE`).
-   - Fallback to `c.env.TURNSTILE_SECRET_KEY`.
+1. **Site Identification (`siteId`)**:
+   - Explicit attribute on forms (e.g. `data-formflare-site="splitphase.io"` or `FormFlare.init({ siteId: 'splitphase.io' })`).
+   - If omitted, automatically derived from the hosting page's hostname (e.g. `window.location.hostname` or HTTP `Origin`/`Referer` -> `splitphase.io`).
+   - Standardized to lowercase string across KV keys (`submission:splitphase.io:...`) and SQL queries (`WHERE site_id = 'splitphase.io'`).
+2. **Smart Secret & Variable Resolution**:
+   - Normalizes domain delimiters to underscore and alphanumeric patterns:
+     - `siteId: "splitphase.io"` checks:
+       1. `KEY_SPLITPHASE_IO` (exact with underscores)
+       2. `KEY_SPLITPHASEIO` (alphanumeric only)
+       3. `KEY_SPLITPHASE` (base domain prefix)
+       4. `KEY` (global fallback)
+   - Applies to `TURNSTILE_SECRET_KEY`, `EMAIL_TO`, `EMAIL_FROM`, `EMAIL_PROVIDER`, `EMAIL_API_KEY`, `MAILGUN_DOMAIN`, `MAILTRAP_INBOX_ID`, `WEBHOOK_URL`.
    - Do NOT infer or split site prefixes from `formId`.
-3. **Email Routing Resolution**:
-   - Recipient: `c.env[`EMAIL_TO_${SITE_ID}`]` -> Fallback: `c.env.EMAIL_TO`.
-   - Sender: `c.env[`EMAIL_FROM_${SITE_ID}`]` -> Fallback: `c.env.EMAIL_FROM`.
-   - Provider: `c.env[`EMAIL_PROVIDER_${SITE_ID}`]` -> Fallback: `c.env.EMAIL_PROVIDER`.
-4. **Webhook URL Resolution**:
-   - `c.env[`WEBHOOK_URL_${SITE_ID}`]` (e.g. `siteId: "mysite"` -> `WEBHOOK_URL_MYSITE`).
-   - Fallback to `c.env.WEBHOOK_URL`.
-5. **Unified Storage Architecture & Multi-Tenancy**:
+3. **Unified Storage Architecture & Multi-Tenancy**:
    - Single storage engine configured globally via `STORAGE_ENGINE` (`"kv"`, `"d1"`, `"none"`).
    - KV Storage: Uses a single global `KV` binding (`[[kv_namespaces]] binding = "KV"`). Submissions are partitioned by key: `submission:${siteId}:${formId}:${submissionId}` and index `index:${siteId}:${formId}`.
    - D1 Storage: Uses a single global `DB` binding (`[[d1_databases]] binding = "DB"`). Submissions are partitioned by SQL column: `WHERE form_id = ? AND site_id = ?`.

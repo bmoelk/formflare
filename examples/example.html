@@ -195,9 +195,10 @@
         const submitBtn = document.getElementById('submit-btn');
         const messageDiv = document.getElementById('message');
 
-        // Replace with your FormFlare worker URL
+        // Replace with your FormFlare worker URL and IDs
         const FORMFLARE_URL = 'https://your-worker.workers.dev/submit';
         const FORM_ID = 'contact-form';
+        const SITE_ID = 'mysite';
 
         function showMessage(text, type) {
             messageDiv.textContent = text;
@@ -237,6 +238,7 @@
                     },
                     body: JSON.stringify({
                         formId: FORM_ID,
+                        siteId: SITE_ID,
                         turnstileToken: turnstileToken,
                         data: data,
                     }),

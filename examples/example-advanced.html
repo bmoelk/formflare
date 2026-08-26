@@ -468,6 +468,7 @@
                     },
                     body: JSON.stringify({
                         formId: formId,
+                        siteId: form.dataset.formflareSite || form.dataset.siteId || 'mysite',
                         turnstileToken: turnstileToken,
                         data: data,
                     }),

@@ -177,8 +177,20 @@
                     return;
                 }
 
-                // Resolve siteId from dataset attribute or global config
-                const siteId = form.dataset.formflareSite || form.dataset.siteId || this.config.siteId || '';
+                // Resolve siteId: explicit dataset/config -> auto-extract hostname from window.location
+                const explicitSiteId = form.dataset.formflareSite || form.dataset.siteId || this.config.siteId;
+                let autoSiteId = '';
+                if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+                    autoSiteId = window.location.hostname.replace(/^www\./i, '').toLowerCase();
+                }
+                const siteId = (explicitSiteId || autoSiteId || '').trim();
+
+                if (!siteId) {
+                    const errorMsg = 'FormFlare: Missing required site ID. Add data-formflare-site="mysite" to your <form> or set siteId in FormFlare.init().';
+                    console.error(errorMsg);
+                    this.showMessage(form, 'Configuration error: Missing site ID', 'error');
+                    return;
+                }
 
                 // Submit to FormFlare
                 const response = await fetch(`${this.config.workerUrl}/submit`, {

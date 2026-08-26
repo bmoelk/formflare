@@ -12,10 +12,12 @@ export interface EmailConfig {
   to: string;
   mailgunDomain?: string; // Required for Mailgun
   mailtrapInboxId?: string; // Required for Mailtrap (testing mode)
+  siteId?: string;
 }
 
 export interface FormSubmissionData {
   formId: string;
+  siteId?: string;
   submissionId: string;
   data: Record<string, any>;
   metadata: {
@@ -67,6 +69,12 @@ export async function sendEmailNotification(
   }
 }
 
+function getEmailSubject(submission: FormSubmissionData): string {
+  return submission.siteId
+    ? `New Form Submission [${submission.siteId}]: ${submission.formId}`
+    : `New Form Submission: ${submission.formId}`;
+}
+
 /**
  * Send email via Console (Dev Output)
  */
@@ -81,10 +89,11 @@ function sendViaConsole(
 │ 📧 [FormFlare Dev Email Logger]                                       │
 ├────────────────────────────────────────────────────────────────────────┤
 │ Form ID:        ${submission.formId}
+│ Site ID:        ${submission.siteId || 'none'}
 │ Submission ID:  ${submission.submissionId}
 │ To:             ${config.to || 'dev@example.com'}
 │ From:           ${config.from || 'noreply@localhost'}
-│ Subject:        New Form Submission: ${submission.formId}
+│ Subject:        ${getEmailSubject(submission)}
 ├────────────────────────────────────────────────────────────────────────┤
 │ Form Data:
 ${JSON.stringify(sanitizedData, null, 2)}
@@ -109,7 +118,7 @@ async function sendViaResend(
     body: JSON.stringify({
       from: config.from,
       to: config.to.split(',').map(email => email.trim()),
-      subject: `New Form Submission: ${submission.formId}`,
+      subject: getEmailSubject(submission),
       html: generateEmailHTML(submission),
       text: generateEmailTEXT(submission),
     }),
@@ -143,7 +152,7 @@ async function sendViaSendGrid(
         },
       ],
       from: { email: config.from },
-      subject: `New Form Submission: ${submission.formId}`,
+      subject: getEmailSubject(submission),
       content: [
         {
           type: 'text/plain',
@@ -179,7 +188,7 @@ async function sendViaMailgun(
   const formData = new FormData();
   formData.append('from', config.from);
   formData.append('to', config.to);
-  formData.append('subject', `New Form Submission: ${submission.formId}`);
+  formData.append('subject', getEmailSubject(submission));
   formData.append('html', generateEmailHTML(submission));
   formData.append('text', generateEmailTEXT(submission));
 
@@ -220,7 +229,7 @@ async function sendViaMailtrap(
     body = {
       from: { email: config.from },
       to: config.to.split(',').map(email => ({ email: email.trim() })),
-      subject: `New Form Submission: ${submission.formId}`,
+      subject: getEmailSubject(submission),
       html: generateEmailHTML(submission),
       text: generateEmailTEXT(submission),
     };
@@ -229,7 +238,7 @@ async function sendViaMailtrap(
     body = {
       from: { email: config.from },
       to: config.to.split(',').map(email => ({ email: email.trim() })),
-      subject: `New Form Submission: ${submission.formId}`,
+      subject: getEmailSubject(submission),
       html: generateEmailHTML(submission),
       text: generateEmailTEXT(submission),
     };
