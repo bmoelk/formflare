@@ -22,12 +22,15 @@ RATE_LIMIT_ENABLED = "false"
 RATE_LIMIT_REQUESTS = "10"
 RATE_LIMIT_WINDOW = "60"
 
+# Default Storage Engine (options: kv, d1, none)
+STORAGE_ENGINE = "kv"
+
 # Default Email Provider (options: none, console, resend, sendgrid, mailgun, mailtrap)
 EMAIL_PROVIDER = "none"
 
 # Infrastructure Bindings (Placeholders only - bound via Cloudflare Dashboard or wrangler.overrides.toml)
 # [[kv_namespaces]]
-# binding = "FORM_SUBMISSIONS"
+# binding = "KV"
 # id = "YOUR_KV_NAMESPACE_ID"
 
 # [[d1_databases]]

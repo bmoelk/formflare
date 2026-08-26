@@ -41,45 +41,51 @@ TURNSTILE_SECRET_KEY=your-actual-secret-key-here
 
 ## Step 4: Choose Your Storage Backend
 
-### Option A: KV Storage (Simpler, good for small-medium volume)
+Set `STORAGE_ENGINE = "kv"`, `"d1"`, or `"none"` in your `wrangler.overrides.toml` (or `.dev.vars` for local dev).
+
+### Option A: Workers KV Storage (Recommended for serverless simplicity)
 
 1. Create a KV namespace:
 ```bash
-wrangler kv namespace create "FORM_SUBMISSIONS"
+npx wrangler kv namespace create KV
 ```
 
-2. Create a preview namespace for development:
-```bash
-wrangler kv namespace create "FORM_SUBMISSIONS" --preview
-```
-
-3. Update `wrangler.toml` with the namespace IDs from the output:
+2. Add the binding and storage engine to your `wrangler.overrides.toml`:
 ```toml
+[vars]
+STORAGE_ENGINE = "kv"
+
 [[kv_namespaces]]
-binding = "FORM_SUBMISSIONS"
+binding = "KV"
 id = "your-kv-namespace-id"
-preview_id = "your-preview-kv-namespace-id"
 ```
 
-### Option B: D1 Database (Recommended for production)
+*(For multi-tenant setups, you can also add dedicated per-site namespaces like `binding = "KV_BRAINENDEAVOR"`).*
+
+### Option B: Cloudflare D1 SQL Database (Recommended for complex relational querying)
 
 1. Create a D1 database:
 ```bash
-wrangler d1 create formflare-db
+npx wrangler d1 create formflare-db
 ```
 
-2. Update `wrangler.toml` with the database ID from the output:
+2. Initialize the database schema:
+```bash
+npx wrangler d1 execute formflare-db --remote --file=./schema.sql
+```
+
+3. Add the binding and storage engine to your `wrangler.overrides.toml`:
 ```toml
+[vars]
+STORAGE_ENGINE = "d1"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "formflare-db"
-database_id = "your-database-id"
+database_id = "your-d1-database-uuid"
 ```
 
-3. Create the database schema:
-```bash
-wrangler d1 execute formflare-db --file=./schema.sql
-```
+*(FormFlare automatically partitions submissions in D1 across multiple tenants via the `site_id` column and `idx_site_form_created_at` index).*
 
 ## Step 5: Test Locally
 
@@ -133,16 +139,18 @@ All configuration parameters and secrets supported by FormFlare are summarized b
 | `RATE_LIMIT_ENABLED` | Var | Optional | `false` | Enable/disable IP rate limiting (true / false). |
 | `RATE_LIMIT_REQUESTS` | Var | Optional | `10` | Max requests allowed per rate limit window per IP. |
 | `RATE_LIMIT_WINDOW` | Var | Optional | `60` | Duration of rate limit window in seconds. |
+| `STORAGE_ENGINE` | Var | Yes | `kv` | Primary storage engine for form submissions (kv, d1, none). |
 | `EMAIL_PROVIDER` | Var | Optional | `none` | Outbound email provider (none, console, mailtrap, resend, sendgrid, mailgun). |
-| `EMAIL_FROM` | Var/Secret | Required (EMAIL_PROVIDER is not 'none' or 'console') | `noreply@splitphase.io` | Outbound 'From' email address (e.g. contact@yourdomain.com). |
+| `EMAIL_FROM` | Var/Secret | Required (Required when EMAIL_PROVIDER is not 'none' or 'console') | - | Outbound 'From' email address (e.g. contact@yourdomain.com). |
 | `EMAIL_TO` | Var/Secret | Required (EMAIL_PROVIDER is not 'none') | - | Target notification recipient email address (e.g. alerts@yourdomain.com). |
 | `EMAIL_API_KEY` | Secret | Required (EMAIL_PROVIDER is not 'none' or 'console') | - | API key for Mailtrap, Resend, SendGrid, or Mailgun. |
+| `EMAIL_API_KEY_${SITE_ID}` | Secret | Optional | - | Per-site email provider API key override (e.g. EMAIL_API_KEY_BRAINENDEAVOR). |
 | `EMAIL_TO_${SITE_ID}` | Var/Secret | Optional | - | Per-site notification recipient email override (e.g. EMAIL_TO_BRAINENDEAVOR). |
 | `EMAIL_FROM_${SITE_ID}` | Var/Secret | Optional | - | Per-site 'From' email sender override (e.g. EMAIL_FROM_BRAINENDEAVOR). |
 | `EMAIL_PROVIDER_${SITE_ID}` | Var | Optional | - | Per-site email provider override (e.g. EMAIL_PROVIDER_BRAINENDEAVOR). |
 | `TURNSTILE_SECRET_KEY` | Secret | Yes | - | Global default Cloudflare Turnstile secret key. |
 | `TURNSTILE_SECRET_KEY_${SITE_ID}` | Secret | Optional | - | Per-site Turnstile secret key (e.g. TURNSTILE_SECRET_KEY_MYSITE). |
-| `API_KEY` | Secret | Optional | - | Bearer API token for admin GET endpoints (/submissions, /submission/:id, /email-test). |
+| `API_KEY` | Secret | Required (Required for admin GET endpoints (/submissions) or /email-test; optional for public submissions which only require a Turnstile token) | - | Bearer API token for admin GET endpoints (/submissions, /submission/:id, /email-test) and webhook signing. Public form submissions only require a Turnstile token. |
 | `WEBHOOK_URL` | Var/Secret | Optional | - | Global fallback webhook POST URL triggered on submission events. |
 | `WEBHOOK_URL_${SITE_ID}` | Var/Secret | Optional | - | Per-site webhook POST URL (e.g. WEBHOOK_URL_MYSITE). |
 | `MAILGUN_DOMAIN` | Var/Secret | Required (EMAIL_PROVIDER is 'mailgun') | - | Mailgun sending domain (required when using Mailgun). |

@@ -41,6 +41,14 @@
       "description": "Duration of rate limit window in seconds."
     },
     {
+      "name": "STORAGE_ENGINE",
+      "kind": "Var",
+      "required": true,
+      "default": "kv",
+      "description": "Primary storage engine for form submissions (kv, d1, none).",
+      "options": ["kv", "d1", "none"]
+    },
+    {
       "name": "EMAIL_PROVIDER",
       "kind": "Var",
       "required": false,
@@ -52,9 +60,8 @@
       "name": "EMAIL_FROM",
       "kind": "Var/Secret",
       "required": false,
-      "default": "noreply@splitphase.io",
       "requiredIf": {
-        "condition": "EMAIL_PROVIDER is not 'none' or 'console'",
+        "condition": "Required when EMAIL_PROVIDER is not 'none' or 'console'",
         "rule": { "var": "EMAIL_PROVIDER", "notIn": ["none", "console"] }
       },
       "description": "Outbound 'From' email address (e.g. contact@yourdomain.com)."
@@ -78,6 +85,12 @@
         "rule": { "var": "EMAIL_PROVIDER", "notIn": ["none", "console"] }
       },
       "description": "API key for Mailtrap, Resend, SendGrid, or Mailgun."
+    },
+    {
+      "name": "EMAIL_API_KEY_${SITE_ID}",
+      "kind": "Secret",
+      "required": false,
+      "description": "Per-site email provider API key override (e.g. EMAIL_API_KEY_BRAINENDEAVOR)."
     },
     {
       "name": "EMAIL_TO_${SITE_ID}",
@@ -113,7 +126,10 @@
       "name": "API_KEY",
       "kind": "Secret",
       "required": false,
-      "description": "Bearer API token for admin GET endpoints (/submissions, /submission/:id, /email-test)."
+      "requiredIf": {
+        "condition": "Required for admin GET endpoints (/submissions) or /email-test; optional for public submissions which only require a Turnstile token"
+      },
+      "description": "Bearer API token for admin GET endpoints (/submissions, /submission/:id, /email-test) and webhook signing. Public form submissions only require a Turnstile token."
     },
     {
       "name": "WEBHOOK_URL",

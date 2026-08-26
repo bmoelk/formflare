@@ -132,11 +132,11 @@ Authorization: Bearer YOUR_API_KEY
 
 ### `GET /submissions/:formId`
 
-Lists historical form submissions stored for a specific `formId`. Supports pagination via `limit` and `offset` query parameters.
+Lists historical form submissions stored for a specific `formId`. Supports multi-tenant filtering via `siteId` and pagination via `limit` and `offset` query parameters.
 
 #### Request
 ```http
-GET /submissions/contact_form?limit=50&offset=0 HTTP/1.1
+GET /submissions/contact_form?siteId=brainendeavor&limit=50&offset=0 HTTP/1.1
 Host: your-worker.workers.dev
 Authorization: Bearer YOUR_API_KEY
 ```
@@ -146,10 +146,12 @@ Authorization: Bearer YOUR_API_KEY
 {
   "success": true,
   "formId": "contact_form",
+  "siteId": "brainendeavor",
   "submissions": [
     {
       "id": "f8a92b10-c3d4-4e5f-9a1b-2c3d4e5f6a7b",
       "formId": "contact_form",
+      "siteId": "brainendeavor",
       "data": {
         "name": "Jane Doe",
         "email": "jane@example.com",
@@ -174,11 +176,11 @@ Authorization: Bearer YOUR_API_KEY
 
 ### `GET /submission/:id`
 
-Retrieves full metadata and payload details for a single submission by its unique submission ID.
+Retrieves full metadata and payload details for a single submission by its unique submission ID. Optional `?siteId=` and `?formId=` parameters can be provided for instant indexed lookup.
 
 #### Request
 ```http
-GET /submission/f8a92b10-c3d4-4e5f-9a1b-2c3d4e5f6a7b HTTP/1.1
+GET /submission/f8a92b10-c3d4-4e5f-9a1b-2c3d4e5f6a7b?siteId=brainendeavor&formId=contact_form HTTP/1.1
 Host: your-worker.workers.dev
 Authorization: Bearer YOUR_API_KEY
 ```

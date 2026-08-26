@@ -4,7 +4,7 @@
  * FormFlare Post-Deployment Verification & Health Diagnostic Script
  * Automatically queries the deployed Worker, verifies active bindings and secrets,
  * and cross-references local overrides (.dev.vars / wrangler.overrides.toml) against
- * the remote deployment.
+ * the remote deployment with full multi-tenant site consistency checks.
  */
 
 const https = require('https');
@@ -39,25 +39,28 @@ function loadManifest() {
   return null;
 }
 
-function getLocalConfigKeys() {
+function getLocalConfig() {
   const localKeys = new Set();
+  const localKeyValues = {};
 
   // 1. Read .dev.vars
   const devVarsPath = path.join(__dirname, '..', '.dev.vars');
   if (fs.existsSync(devVarsPath)) {
     const lines = fs.readFileSync(devVarsPath, 'utf-8').split('\n');
     for (const line of lines) {
-      const match = line.trim().match(/^([A-Za-z0-9_]+)\s*=/);
+      const match = line.trim().match(/^([A-Za-z0-9_]+)\s*=\s*(.*)$/);
       if (match && !match[1].startsWith('#')) {
         localKeys.add(match[1]);
+        localKeyValues[match[1]] = match[2].trim().replace(/^["']|["']$/g, '');
       }
     }
   }
 
-  // 2. Read wrangler.overrides.toml [vars]
+  // 2. Read wrangler.overrides.toml
   const overridesPath = path.join(__dirname, '..', 'wrangler.overrides.toml');
   if (fs.existsSync(overridesPath)) {
-    const lines = fs.readFileSync(overridesPath, 'utf-8').split('\n');
+    const content = fs.readFileSync(overridesPath, 'utf-8');
+    const lines = content.split('\n');
     let inVars = false;
     for (const line of lines) {
       const trimmed = line.trim();
@@ -70,15 +73,31 @@ function getLocalConfigKeys() {
         continue;
       }
       if (inVars) {
-        const match = trimmed.match(/^([A-Za-z0-9_]+)\s*=/);
+        const match = trimmed.match(/^([A-Za-z0-9_]+)\s*=\s*(.*)$/);
         if (match && !match[1].startsWith('#')) {
           localKeys.add(match[1]);
+          localKeyValues[match[1]] = match[2].trim().replace(/^["']|["']$/g, '');
         }
       }
     }
+
+    // Check bound KV namespaces in overrides
+    const kvMatches = content.matchAll(/\[\[kv_namespaces\]\][^\[]*binding\s*=\s*"([^"]+)"/g);
+    for (const match of kvMatches) {
+      localKeys.add(match[1]);
+    }
+
+    // Check bound D1 databases in overrides
+    const d1Matches = content.matchAll(/\[\[d1_databases\]\][^\[]*binding\s*=\s*"([^"]+)"/g);
+    for (const match of d1Matches) {
+      localKeys.add(match[1]);
+    }
   }
 
-  return Array.from(localKeys);
+  return {
+    keys: Array.from(localKeys),
+    values: localKeyValues,
+  };
 }
 
 async function verifyDeployment() {
@@ -86,7 +105,7 @@ async function verifyDeployment() {
   const manifest = loadManifest();
 
   console.log(`\n========================================================================`);
-  console.log(`🔍 FormFlare Post-Deployment Health & Variable Verification`);
+  console.log(`🔍 FormFlare Post-Deployment Health & Consistency Verification`);
   console.log(`========================================================================`);
   console.log(`Target Worker:   ${targetUrl}`);
 
@@ -105,7 +124,7 @@ async function verifyDeployment() {
     console.log(`Service Status:  ✅ ${(status || 'healthy').toUpperCase()} (v${version || '1.0.0'})`);
     console.log(`Environment:     ${environment || 'production'}`);
     console.log(`------------------------------------------------------------------------`);
-    console.log(`Core Bindings & Configuration Check:`);
+    console.log(`Core Storage Engine & Global Bindings:`);
 
     const warnings = [];
 
@@ -115,12 +134,24 @@ async function verifyDeployment() {
       return;
     }
 
-    // 1. Storage Check
-    if (config.storage === 'none') {
-      console.log(`  • Storage:          ⚠️ NONE (Submissions will not be saved to KV/D1)`);
-      warnings.push(`Attach a KV namespace or D1 database in wrangler.overrides.toml`);
-    } else {
-      console.log(`  • Storage:          ✅ ${config.storage.toUpperCase()} Storage Active`);
+    // 1. Storage Engine Verification
+    const engine = (config.storageEngine || config.storage || 'none').toLowerCase();
+    if (engine === 'none') {
+      console.log(`  • Storage Engine:   ℹ️  NONE (Persistence is disabled)`);
+    } else if (engine === 'kv') {
+      if (config.kvBound || config.storageConfigured || (config.configuredKeys && config.configuredKeys.includes('KV'))) {
+        console.log(`  • Storage Engine:   ✅ KV Storage Active (Binding: KV)`);
+      } else {
+        console.log(`  • Storage Engine:   ❌ MISCONFIGURED (STORAGE_ENGINE is 'kv' but binding 'KV' is missing)`);
+        warnings.push(`STORAGE_ENGINE is 'kv', but no KV namespace is bound. Attach [[kv_namespaces]] binding = "KV" in wrangler.overrides.toml`);
+      }
+    } else if (engine === 'd1') {
+      if (config.d1Bound || (config.configuredKeys && config.configuredKeys.includes('DB'))) {
+        console.log(`  • Storage Engine:   ✅ D1 SQL Database Active (Binding: DB)`);
+      } else {
+        console.log(`  • Storage Engine:   ❌ MISCONFIGURED (STORAGE_ENGINE is 'd1' but D1 binding 'DB' is missing)`);
+        warnings.push(`STORAGE_ENGINE is 'd1', but D1 binding 'DB' is missing. Attach [[d1_databases]] binding = "DB" in wrangler.overrides.toml`);
+      }
     }
 
     // 2. Email Provider & Keys Check
@@ -135,6 +166,13 @@ async function verifyDeployment() {
         warnings.push(`Set EMAIL_TO in wrangler.overrides.toml or via: npx wrangler secret put EMAIL_TO`);
       } else {
         console.log(`  • Email Recipient:  ✅ Configured (EMAIL_TO)`);
+      }
+
+      if (!config.emailFromConfigured) {
+        console.log(`  • Email Sender:     ❌ MISSING (EMAIL_FROM is not set)`);
+        warnings.push(`Set EMAIL_FROM in wrangler.overrides.toml or via: npx wrangler secret put EMAIL_FROM`);
+      } else {
+        console.log(`  • Email Sender:     ✅ Configured (EMAIL_FROM)`);
       }
 
       if (emailProvider !== 'console') {
@@ -158,20 +196,68 @@ async function verifyDeployment() {
     // 4. Rate Limiting Check
     console.log(`  • Rate Limiting:    ${config.rateLimitEnabled ? '✅ Enabled' : 'ℹ️  Disabled'}`);
 
-    // 5. Cross-Reference Local vs Remote Environment Keys
-    const localKeys = getLocalConfigKeys();
-    if (localKeys.length > 0 && config.configuredKeys) {
-      console.log(`------------------------------------------------------------------------`);
-      console.log(`Local vs. Remote Key Cross-Reference:`);
-      const remoteKeySet = new Set(config.configuredKeys);
+    // 5. Multi-Tenant Per-Site Consistency Check
+    const local = getLocalConfig();
+    const remoteKeySet = new Set(config.configuredKeys || []);
 
-      for (const key of localKeys) {
+    // Detect all referenced site IDs from local config (e.g. BRAINENDEAVOR, SPLITPHASE)
+    const siteIds = new Set();
+    for (const key of local.keys) {
+      const match = key.match(/^(?:TURNSTILE_SECRET_KEY|EMAIL_TO|EMAIL_FROM|EMAIL_PROVIDER|EMAIL_API_KEY|WEBHOOK_URL)_([A-Z0-9_]+)$/);
+      if (match) {
+        siteIds.add(match[1]);
+      }
+    }
+
+    if (siteIds.size > 0) {
+      console.log(`------------------------------------------------------------------------`);
+      console.log(`Multi-Tenant Site Consistency Matrix:`);
+
+      for (const siteId of siteIds) {
+        console.log(`\n  [Site: ${siteId}]`);
+
+        // Check Multi-Tenant Storage Partitioning
+        if (engine === 'kv') {
+          console.log(`    • Storage Engine:  ✅ KV Namespace (Partitioned keys: submission:${siteId.toLowerCase()}:<formId>:<id>)`);
+        } else if (engine === 'd1') {
+          console.log(`    • Storage Engine:  ✅ D1 SQL Database (Partitioned rows: WHERE site_id='${siteId.toLowerCase()}')`);
+        } else {
+          console.log(`    • Storage Engine:  ℹ️  Persistence Disabled (STORAGE_ENGINE='none')`);
+        }
+
+        // Check Site Turnstile
+        const siteTurnstileKey = `TURNSTILE_SECRET_KEY_${siteId}`;
+        if (remoteKeySet.has(siteTurnstileKey)) {
+          console.log(`    • Turnstile:       ✅ Site-Specific Key (${siteTurnstileKey})`);
+        } else if (config.turnstileConfigured) {
+          console.log(`    • Turnstile:       ℹ️  Using Global Turnstile Secret Fallback`);
+        } else {
+          console.log(`    • Turnstile:       ❌ Missing (${siteTurnstileKey} or global TURNSTILE_SECRET_KEY)`);
+          warnings.push(`Site '${siteId}' has no Turnstile secret key set.`);
+        }
+
+        // Check Site Email Target
+        const siteEmailToKey = `EMAIL_TO_${siteId}`;
+        if (remoteKeySet.has(siteEmailToKey)) {
+          console.log(`    • Email Alerts:    ✅ Site-Specific Recipient (${siteEmailToKey})`);
+        } else if (config.emailToConfigured) {
+          console.log(`    • Email Alerts:    ℹ️  Using Global Recipient Fallback (EMAIL_TO)`);
+        }
+      }
+    }
+
+    // 6. Cross-Reference Local vs Remote Environment Keys
+    if (local.keys.length > 0 && config.configuredKeys) {
+      console.log(`------------------------------------------------------------------------`);
+      console.log(`Local vs. Remote Key Provisioning Check:`);
+
+      for (const key of local.keys) {
         if (['DEV_MOCK_TURNSTILE', 'DEV_MODE'].includes(key)) continue;
 
         if (remoteKeySet.has(key)) {
-          console.log(`  • ${key.padEnd(30)} ✅ Provisioned in remote deployment`);
+          console.log(`  • ${key.padEnd(32)} ✅ Active in remote deployment`);
         } else {
-          console.log(`  • ${key.padEnd(30)} ❌ MISSING in remote deployment!`);
+          console.log(`  • ${key.padEnd(32)} ❌ MISSING in remote deployment!`);
           warnings.push(`Local key '${key}' is defined locally but missing on remote Worker. Set via: npx wrangler secret put ${key}`);
         }
       }
@@ -180,7 +266,7 @@ async function verifyDeployment() {
     console.log(`------------------------------------------------------------------------`);
 
     if (warnings.length === 0) {
-      console.log(`🎉 All required environment variables and bindings are active and verified!`);
+      console.log(`🎉 All required environment variables, bindings, and multi-tenant sites are verified!`);
     } else {
       console.log(`⚠️  ATTENTION REQUIRED (${warnings.length} warning${warnings.length > 1 ? 's' : ''}):`);
       warnings.forEach((warn, idx) => {

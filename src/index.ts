@@ -7,9 +7,10 @@ import { checkRateLimit } from './ratelimit';
 import { sendEmailNotification, type EmailConfig } from './email';
 
 type Bindings = {
-    FORM_SUBMISSIONS?: KVNamespace;
+    KV?: KVNamespace;
     DB?: D1Database;
     ENVIRONMENT?: string;
+    STORAGE_ENGINE?: string;
     DEV_MODE?: string;
     DEV_MOCK_TURNSTILE?: string;
     TURNSTILE_SECRET_KEY?: string;
@@ -47,6 +48,7 @@ app.use('/*', async (c, next) => {
 // Health check endpoint with safe configuration diagnostic status
 app.get('/', (c) => {
     const knownPrefixes = [
+        'STORAGE_ENGINE',
         'TURNSTILE_SECRET_KEY',
         'EMAIL_TO',
         'EMAIL_FROM',
@@ -61,10 +63,24 @@ app.get('/', (c) => {
         'ENVIRONMENT',
     ];
 
-    const configuredKeys = Object.keys(c.env || {}).filter((key) =>
-        typeof (c.env as Record<string, any>)[key] === 'string' &&
+    const envObj = (c.env || {}) as Record<string, any>;
+
+    const stringKeys = Object.keys(envObj).filter((key) =>
+        typeof envObj[key] === 'string' &&
         knownPrefixes.some((prefix) => key === prefix || key.startsWith(`${prefix}_`))
     );
+
+    const kvBound = !!(c.env.KV && typeof c.env.KV.get === 'function');
+    const d1Bound = !!(c.env.DB && typeof c.env.DB.prepare === 'function');
+
+    const configuredKeys = Array.from(new Set([
+        ...stringKeys,
+        ...(kvBound ? ['KV'] : []),
+        ...(d1Bound ? ['DB'] : []),
+    ]));
+
+    const storageEngine = (c.env.STORAGE_ENGINE || (d1Bound ? 'd1' : kvBound ? 'kv' : 'none')).toLowerCase();
+    const storageConfigured = storageEngine === 'd1' ? d1Bound : storageEngine === 'kv' ? kvBound : false;
 
     return c.json({
         service: 'FormFlare',
@@ -72,9 +88,14 @@ app.get('/', (c) => {
         status: 'healthy',
         environment: c.env.ENVIRONMENT || 'production',
         config: {
-            storage: c.env.DB ? 'd1' : c.env.FORM_SUBMISSIONS ? 'kv' : 'none',
+            storageEngine,
+            storageConfigured,
+            storage: storageConfigured ? storageEngine : 'none',
+            kvBound,
+            d1Bound,
             emailProvider: c.env.EMAIL_PROVIDER || 'none',
             emailToConfigured: !!c.env.EMAIL_TO,
+            emailFromConfigured: !!c.env.EMAIL_FROM,
             emailApiKeyConfigured: !!c.env.EMAIL_API_KEY,
             turnstileConfigured: !!c.env.TURNSTILE_SECRET_KEY,
             rateLimitEnabled: c.env.RATE_LIMIT_ENABLED === 'true',
@@ -95,7 +116,7 @@ app.post('/submit', async (c) => {
         const rateLimitEnabled = c.env.RATE_LIMIT_ENABLED?.toLowerCase() === 'true';
         if (rateLimitEnabled) {
             const rateLimitResult = await checkRateLimit(
-                c.env.FORM_SUBMISSIONS,
+                c.env.KV,
                 c.env.DB,
                 clientIP,
                 parseInt(c.env.RATE_LIMIT_REQUESTS || '10'),
@@ -175,6 +196,7 @@ app.post('/submit', async (c) => {
         // Prepare submission data
         const submissionData = {
             formId,
+            siteId: siteId ? String(siteId) : undefined,
             data,
             metadata: {
                 ip: clientIP,
@@ -184,41 +206,64 @@ app.post('/submit', async (c) => {
             },
         };
 
-        // Store submission
-        const submissionId = await storeSubmission(
-            submissionData,
-            c.env.FORM_SUBMISSIONS,
-            c.env.DB,
-        );
+        // Storage Engine resolution (Global STORAGE_ENGINE -> "kv")
+        const storageEngine = (c.env.STORAGE_ENGINE || 'kv').toLowerCase();
+
+        // Store submission according to configured engine
+        let submissionId = '';
+        if (storageEngine === 'd1') {
+            if (!c.env.DB) {
+                console.error(`❌ STORAGE_ENGINE is set to 'd1', but D1 database binding 'DB' is missing in Wrangler!`);
+            }
+            submissionId = await storeSubmission(submissionData, undefined, c.env.DB);
+        } else if (storageEngine === 'kv') {
+            if (!c.env.KV) {
+                console.error(`❌ STORAGE_ENGINE is set to 'kv', but KV namespace binding 'KV' is missing in Wrangler!`);
+            }
+            submissionId = await storeSubmission(submissionData, c.env.KV, undefined);
+        } else {
+            // 'none': process without persistence
+            submissionId = await storeSubmission(submissionData, undefined, undefined);
+        }
 
         // Dynamic Per-Site Email & Webhook Resolution:
         const envRecord = c.env as Record<string, string | undefined>;
         const siteEmailToKey = cleanSiteId ? `EMAIL_TO_${cleanSiteId}` : '';
         const siteEmailFromKey = cleanSiteId ? `EMAIL_FROM_${cleanSiteId}` : '';
         const siteEmailProviderKey = cleanSiteId ? `EMAIL_PROVIDER_${cleanSiteId}` : '';
+        const siteEmailApiKeyKey = cleanSiteId ? `EMAIL_API_KEY_${cleanSiteId}` : '';
+        const siteMailgunDomainKey = cleanSiteId ? `MAILGUN_DOMAIN_${cleanSiteId}` : '';
+        const siteMailtrapInboxIdKey = cleanSiteId ? `MAILTRAP_INBOX_ID_${cleanSiteId}` : '';
 
         const resolvedEmailTo = (siteEmailToKey && envRecord[siteEmailToKey]) || c.env.EMAIL_TO || '';
-        const resolvedEmailFrom = (siteEmailFromKey && envRecord[siteEmailFromKey]) || c.env.EMAIL_FROM || 'noreply@splitphase.io';
+        const resolvedEmailFrom = (siteEmailFromKey && envRecord[siteEmailFromKey]) || c.env.EMAIL_FROM || '';
         const resolvedEmailProvider = ((siteEmailProviderKey && envRecord[siteEmailProviderKey]) || c.env.EMAIL_PROVIDER || 'none').toLowerCase() as any;
+        const resolvedEmailApiKey = (siteEmailApiKeyKey && envRecord[siteEmailApiKeyKey]) || c.env.EMAIL_API_KEY || '';
+        const resolvedMailgunDomain = (siteMailgunDomainKey && envRecord[siteMailgunDomainKey]) || c.env.MAILGUN_DOMAIN;
+        const resolvedMailtrapInboxId = (siteMailtrapInboxIdKey && envRecord[siteMailtrapInboxIdKey]) || c.env.MAILTRAP_INBOX_ID;
 
         // Send email notification (if configured)
         const emailConfig: EmailConfig = {
             provider: resolvedEmailProvider,
-            apiKey: c.env.EMAIL_API_KEY || '',
+            apiKey: resolvedEmailApiKey,
             from: resolvedEmailFrom,
             to: resolvedEmailTo,
-            mailgunDomain: c.env.MAILGUN_DOMAIN,
-            mailtrapInboxId: c.env.MAILTRAP_INBOX_ID,
+            mailgunDomain: resolvedMailgunDomain,
+            mailtrapInboxId: resolvedMailtrapInboxId,
         };
 
-        if (emailConfig.provider !== 'none' && emailConfig.to) {
-            const emailPromise = sendEmailNotification(emailConfig, {
-                ...submissionData,
-                submissionId,
-            }).catch((error) => {
-                console.error('Email notification failed:', error);
-            });
-            c.executionCtx.waitUntil(emailPromise);
+        if (emailConfig.provider !== 'none') {
+            if (!emailConfig.to || !emailConfig.from) {
+                console.warn('⚠️ Email notification skipped: EMAIL_TO or EMAIL_FROM is missing.');
+            } else {
+                const emailPromise = sendEmailNotification(emailConfig, {
+                    ...submissionData,
+                    submissionId,
+                }).catch((error) => {
+                    console.error('Email notification failed:', error);
+                });
+                c.executionCtx.waitUntil(emailPromise);
+            }
         }
 
         // Send webhook (if configured)
@@ -281,13 +326,19 @@ app.get('/submissions/:formId', async (c) => {
         }
 
         const formId = c.req.param('formId');
+        const siteId = c.req.query('siteId');
+        const cleanSiteId = siteId ? String(siteId).replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : '';
         const limit = parseInt(c.req.query('limit') || '100');
         const offset = parseInt(c.req.query('offset') || '0');
 
+        // Storage Engine resolution (Global STORAGE_ENGINE -> "kv")
+        const storageEngine = (c.env.STORAGE_ENGINE || 'kv').toLowerCase();
+
         const submissions = await getSubmissions(
-            c.env.FORM_SUBMISSIONS,
-            c.env.DB,
+            storageEngine === 'kv' ? c.env.KV : undefined,
+            storageEngine === 'd1' ? c.env.DB : undefined,
             formId,
+            siteId,
             limit,
             offset
         );
@@ -295,6 +346,8 @@ app.get('/submissions/:formId', async (c) => {
         return c.json({
             success: true,
             formId,
+            siteId: siteId || 'default',
+            storageEngine,
             submissions,
             pagination: {
                 limit,
@@ -328,10 +381,18 @@ app.get('/submission/:id', async (c) => {
         }
 
         const submissionId = c.req.param('id');
+        const siteId = c.req.query('siteId');
+        const formId = c.req.query('formId');
+
+        // Storage Engine resolution (Global STORAGE_ENGINE -> "kv")
+        const storageEngine = (c.env.STORAGE_ENGINE || 'kv').toLowerCase();
+
         const submission = await getSubmission(
-            c.env.FORM_SUBMISSIONS,
-            c.env.DB,
-            submissionId
+            storageEngine === 'kv' ? c.env.KV : undefined,
+            storageEngine === 'd1' ? c.env.DB : undefined,
+            submissionId,
+            siteId,
+            formId
         );
 
         if (!submission) {

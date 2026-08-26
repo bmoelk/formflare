@@ -48,7 +48,8 @@ async function setupLocalDev() {
   console.log('\n--- 🛠️  Local Development Environment Setup (.dev.vars) ---');
   console.log('This sets up your git-ignored local environment file (.dev.vars) for offline development.\n');
 
-  const provider = (await askQuestion('Select Email Provider (console/none/resend/mailgun/sendgrid) [console]: ')).trim() || 'console';
+  const storageEngine = (await askQuestion('Select Storage Engine (kv/d1/none) [kv]: ')).trim().toLowerCase() || 'kv';
+  const provider = (await askQuestion('Select Email Provider (console/none/resend/mailgun/sendgrid/mailtrap) [console]: ')).trim() || 'console';
   const emailTo = (await askQuestion('Enter notification target email (EMAIL_TO) [dev@example.com]: ')).trim() || 'dev@example.com';
   const emailFrom = (await askQuestion('Enter sender email (EMAIL_FROM) [noreply@localhost]: ')).trim() || 'noreply@localhost';
   const apiKey = (await askQuestion('Enter local API Key [dev-secret-key-123]: ')).trim() || 'dev-secret-key-123';
@@ -59,6 +60,7 @@ ENVIRONMENT=development
 DEV_MODE=true
 DEV_MOCK_TURNSTILE=true
 ALLOWED_ORIGINS=*
+STORAGE_ENGINE=${storageEngine}
 
 TURNSTILE_SECRET_KEY=1x00000000000000000000AA00000000000
 EMAIL_PROVIDER=${provider}
@@ -76,56 +78,117 @@ API_KEY=${apiKey}
         path: targetPath,
         relativePath: '.dev.vars',
         status: 'CREATED / UPDATED',
-        summary: `DEV_MODE=true, EMAIL_PROVIDER=${provider}, EMAIL_TO=${emailTo}, API_KEY=${apiKey}`,
+        summary: `STORAGE_ENGINE=${storageEngine}, EMAIL_PROVIDER=${provider}, EMAIL_TO=${emailTo}, API_KEY=${apiKey}`,
       },
     ],
     nextSteps: [
       'Run local dev server: npx wrangler dev',
-      'Submit a form locally to test console logger output.',
+      'Submit a form locally to test form ingestion.',
       'Check status: git status (verify .dev.vars remains untracked)',
     ],
   });
 }
 
 async function setupProdDeployment() {
-  console.log('\n--- 🚀 Production Deployment Setup ---');
-  console.log('Configures production environment variables & generates secret provisioning commands.\n');
+  console.log('\n--- 🚀 Production Deployment Setup (wrangler.overrides.toml) ---');
+  console.log('Configures production environment variables & generates Wrangler infrastructure bindings.\n');
 
   const allowedOrigins = (await askQuestion('Enter allowed CORS origins (ALLOWED_ORIGINS) [e.g. https://brainendeavor.com,https://splitphase.io]: ')).trim() || '*';
-  const emailTo = (await askQuestion('Enter production alert recipient (EMAIL_TO) [e.g. alerts@yourdomain.com]: ')).trim();
-  const provider = (await askQuestion('Select Production Email Provider (resend/sendgrid/mailgun/none) [resend]: ')).trim() || 'resend';
+  const storageEngine = (await askQuestion('Select Storage Engine: 1) Cloudflare KV [Default], 2) Cloudflare D1 SQL, 3) None [1]: ')).trim() || '1';
 
-  console.log('\n📌 Save local production overrides to git-ignored .dev.vars? (y/N): ');
-  const saveLocal = (await askQuestion('')).trim().toLowerCase();
+  let storageType = 'kv';
+  let bindingBlock = '';
 
-  if (saveLocal === 'y' || saveLocal === 'yes') {
-    const devVarsPath = path.join(__dirname, '..', '.dev.vars');
-    let existingContent = fs.existsSync(devVarsPath) ? fs.readFileSync(devVarsPath, 'utf-8') : '';
-
-    const newVars = `
-# Production Overrides (Saved via Setup Wizard)
-ENVIRONMENT=production
-ALLOWED_ORIGINS=${allowedOrigins}
-EMAIL_PROVIDER=${provider}
-${emailTo ? `EMAIL_TO=${emailTo}` : ''}
+  if (storageEngine === '2' || storageEngine.toLowerCase() === 'd1') {
+    storageType = 'd1';
+    console.log('\n📌 Setting up Cloudflare D1 SQL Database:');
+    console.log('1. If not yet created, run: npx wrangler d1 create formflare-db');
+    console.log('2. Apply schema: npx wrangler d1 execute formflare-db --remote --file=./schema.sql\n');
+    const dbId = (await askQuestion('Enter D1 Database ID (UUID): ')).trim();
+    if (dbId) {
+      bindingBlock = `
+[[d1_databases]]
+binding = "DB"
+database_name = "formflare-db"
+database_id = "${dbId}"
 `;
-    fs.writeFileSync(devVarsPath, existingContent + newVars, 'utf-8');
-    console.log('✅ Appended production overrides to .dev.vars');
+    }
+  } else if (storageEngine === '3' || storageEngine.toLowerCase() === 'none') {
+    storageType = 'none';
+  } else {
+    storageType = 'kv';
+    console.log('\n📌 Setting up Cloudflare Workers KV Namespace:');
+    console.log('1. If not yet created, run: npx wrangler kv namespace create KV\n');
+    const kvId = (await askQuestion('Enter KV Namespace ID: ')).trim();
+    if (kvId) {
+      bindingBlock = `
+[[kv_namespaces]]
+binding = "KV"
+id = "${kvId}"
+`;
+    }
   }
+
+  const provider = (await askQuestion('\nSelect Production Email Provider (mailtrap/resend/sendgrid/mailgun/none) [mailtrap]: ')).trim() || 'mailtrap';
+  let emailTo = '';
+  let emailFrom = '';
+
+  if (provider !== 'none') {
+    emailTo = (await askQuestion('Enter production alert recipient (EMAIL_TO) [e.g. alerts@yourdomain.com]: ')).trim();
+    emailFrom = (await askQuestion('Enter production sender address (EMAIL_FROM) [e.g. contact@yourdomain.com]: ')).trim();
+  }
+
+  const overridesPath = path.join(__dirname, '..', 'wrangler.overrides.toml');
+  const overridesContent = `# wrangler.overrides.toml (Git-Ignored Production Deployment Overrides)
+# Generated by FormFlare Interactive Setup Wizard
+name = "formflare"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[assets]
+directory = "public"
+binding = "ASSETS"
+
+[[rules]]
+type = "Text"
+globs = ["**/*.mustache"]
+fallthrough = true
+
+[vars]
+ENVIRONMENT = "production"
+ALLOWED_ORIGINS = "${allowedOrigins}"
+STORAGE_ENGINE = "${storageType}"
+RATE_LIMIT_ENABLED = "false"
+RATE_LIMIT_REQUESTS = "10"
+RATE_LIMIT_WINDOW = "60"
+EMAIL_PROVIDER = "${provider}"
+${emailTo ? `EMAIL_TO = "${emailTo}"` : ''}
+${emailFrom ? `EMAIL_FROM = "${emailFrom}"` : ''}
+${bindingBlock}
+`;
+
+  fs.writeFileSync(overridesPath, overridesContent, 'utf-8');
 
   console.log('\n📌 Cloudflare KMS Production Secret Commands');
   console.log('Execute the following commands in your terminal to set production secrets in Cloudflare KMS:\n');
   console.log('  npx wrangler secret put TURNSTILE_SECRET_KEY');
   console.log('  npx wrangler secret put API_KEY');
-  if (provider !== 'none') {
+  if (provider !== 'none' && provider !== 'console') {
     console.log('  npx wrangler secret put EMAIL_API_KEY');
   }
 
   printManifest({
-    modifiedFiles: [],
+    modifiedFiles: [
+      {
+        path: overridesPath,
+        relativePath: 'wrangler.overrides.toml',
+        status: 'CREATED / UPDATED',
+        summary: `STORAGE_ENGINE=${storageType}, EMAIL_PROVIDER=${provider}, ALLOWED_ORIGINS=${allowedOrigins}`,
+      },
+    ],
     nextSteps: [
-      'Set Cloudflare KMS secrets above.',
-      'Deploy to Cloudflare Workers: npx wrangler deploy',
+      'Set Cloudflare KMS secrets listed above.',
+      'Deploy to Cloudflare Workers: npm run deploy:prod',
     ],
   });
 }
@@ -133,9 +196,8 @@ ${emailTo ? `EMAIL_TO=${emailTo}` : ''}
 async function setupAdvancedMenu() {
   console.log('\n--- ⚙️  Advanced Developer Tools (Optional) ---');
   console.log('  1. Custom Domain Route & Production Overrides (wrangler.overrides.toml)');
-  console.log('     ℹ️  Optional: Useful for custom domain routing, private KV bindings, and deployment overrides.');
   console.log('  2. Multi-Tenant Per-Site Secrets & Webhooks Helper');
-  console.log('     ℹ️  Optional: Generate secret commands for multi-site keys (e.g. TURNSTILE_SECRET_KEY_BRAINENDEAVOR).\n');
+  console.log('');
 
   const choice = (await askQuestion('Enter choice (1-2) [default: 1]: ')).trim() || '1';
 
@@ -151,9 +213,7 @@ async function setupAdvancedMenu() {
 async function setupLocalRoute() {
   console.log('\n--- 🌐 Custom Domain Route Setup (wrangler.overrides.toml) [OPTIONAL] ---');
   console.log('ℹ️  Purpose & Use Case:');
-  console.log('  This creates an uncommitted wrangler.overrides.toml file for deployment overrides or custom routes.');
-  console.log('  Use this if you are testing same-origin CORS headers, cookies, or custom domains');
-  console.log('  (e.g., contact.splitphase.local via /etc/hosts) before deploying to production.\n');
+  console.log('  This creates an uncommitted wrangler.overrides.toml file for deployment overrides or custom routes.\n');
 
   const customDomain = (await askQuestion('Enter custom domain pattern (e.g. contact.splitphase.local): ')).trim();
 
@@ -192,7 +252,7 @@ custom_domain = true
 
 async function setupMultiSiteSecrets() {
   console.log('\n--- 🗝️  Multi-Tenant Per-Site Secrets & Webhooks Helper [OPTIONAL] ---');
-  console.log('FormFlare supports site-specific Turnstile keys and Webhook URLs based on siteId.\n');
+  console.log('FormFlare supports site-specific Turnstile keys, Email routes, and Webhook URLs based on siteId.\n');
 
   const siteId = (await askQuestion('Enter target site identifier (siteId) [e.g. brainendeavor]: ')).trim();
 
@@ -205,6 +265,7 @@ async function setupMultiSiteSecrets() {
 
   console.log(`\nCommands for site '${siteId}' (Prefix: ${cleanSiteId}):\n`);
   console.log(`  npx wrangler secret put TURNSTILE_SECRET_KEY_${cleanSiteId}`);
+  console.log(`  npx wrangler secret put EMAIL_API_KEY_${cleanSiteId}`);
   console.log(`  npx wrangler secret put WEBHOOK_URL_${cleanSiteId}`);
   console.log('');
 

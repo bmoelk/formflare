@@ -18,7 +18,7 @@ This file defines coding standards, repository policies, and security guardrails
 >    - Production secrets (API keys, Turnstile secret keys) must be set via `npx wrangler secret put KEY_NAME` or Cloudflare Dashboard KMS.
 > 
 > 3. **Private Production Deployments (`wrangler.overrides.toml`)**:
->    - Account-specific production bindings (e.g. `FORM_SUBMISSIONS` KV namespace ID, private `ALLOWED_ORIGINS`, and production `EMAIL_TO`) MUST be specified in `wrangler.overrides.toml` (git-ignored).
+>    - Account-specific production bindings (e.g. `KV` namespace ID, `DB` database ID, private `ALLOWED_ORIGINS`, and production `EMAIL_TO`) MUST be specified in `wrangler.overrides.toml` (git-ignored).
 >    - Deploy to your private account using:
 >      ```bash
 >      npx wrangler deploy -c wrangler.overrides.toml
@@ -42,6 +42,10 @@ This file defines coding standards, repository policies, and security guardrails
 4. **Webhook URL Resolution**:
    - `c.env[`WEBHOOK_URL_${SITE_ID}`]` (e.g. `siteId: "mysite"` -> `WEBHOOK_URL_MYSITE`).
    - Fallback to `c.env.WEBHOOK_URL`.
+5. **Unified Storage Architecture & Multi-Tenancy**:
+   - Single storage engine configured globally via `STORAGE_ENGINE` (`"kv"`, `"d1"`, `"none"`).
+   - KV Storage: Uses a single global `KV` binding (`[[kv_namespaces]] binding = "KV"`). Submissions are partitioned by key: `submission:${siteId}:${formId}:${submissionId}` and index `index:${siteId}:${formId}`.
+   - D1 Storage: Uses a single global `DB` binding (`[[d1_databases]] binding = "DB"`). Submissions are partitioned by SQL column: `WHERE form_id = ? AND site_id = ?`.
 
 ---
 
