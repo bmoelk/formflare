@@ -1,6 +1,5 @@
-/**
- * Simple rate limiting using KV
- */
+import { type Logger } from './logger';
+
 /**
  * Rate limiting using KV or D1
  */
@@ -9,7 +8,8 @@ export async function checkRateLimit(
     db: D1Database | undefined,
     identifier: string,
     maxRequests: number,
-    windowSeconds: number
+    windowSeconds: number,
+    logger?: Logger
 ): Promise<{ allowed: boolean; retryAfter?: number }> {
     const key = `ratelimit:${identifier}`;
     const now = Date.now();
@@ -41,6 +41,7 @@ export async function checkRateLimit(
         // Check if limit exceeded
         if (existing.count >= maxRequests) {
             const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
+            logger?.warn('RateLimit', `Limit exceeded for IP ${identifier} (Retry after ${retryAfter}s)`);
             return { allowed: false, retryAfter };
         }
 
@@ -82,6 +83,7 @@ export async function checkRateLimit(
             // Check if limit exceeded
             if (existing.count >= maxRequests) {
                 const retryAfter = Math.ceil((existing.reset_at - now) / 1000);
+                logger?.warn('RateLimit', `Limit exceeded for IP ${identifier} (Retry after ${retryAfter}s)`);
                 return { allowed: false, retryAfter };
             }
 
@@ -93,7 +95,11 @@ export async function checkRateLimit(
 
             return { allowed: true };
         } catch (error) {
-            console.error('Rate limit D1 error:', error);
+            if (logger) {
+                logger.error('RateLimit', 'Rate limit D1 query error', error);
+            } else {
+                console.error('Rate limit D1 error:', error);
+            }
             // Fail open on database error to avoid blocking legitimate traffic due to infrastructure issues
             return { allowed: true };
         }

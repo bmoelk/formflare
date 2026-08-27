@@ -15,6 +15,7 @@ fallthrough = true
 # ZERO secrets, private email addresses, or custom domain routes should be stored here!
 [vars]
 ENVIRONMENT = "production"
+LOG_LEVEL = "warn"
 ALLOWED_ORIGINS = "*"
 
 # Rate Limiting Configuration

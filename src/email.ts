@@ -3,6 +3,7 @@
  * Supports multiple email providers: Resend, SendGrid, Mailgun, Mailtrap, Console
  */
 
+import { type Logger } from './logger';
 import { generateEmailHTML, generateEmailTEXT, sanitizeSubmissionData } from './templates';
 
 export interface EmailConfig {
@@ -33,9 +34,16 @@ export interface FormSubmissionData {
  */
 export async function sendEmailNotification(
   config: EmailConfig,
-  submission: FormSubmissionData
+  submission: FormSubmissionData,
+  logger?: Logger
 ): Promise<{ success: boolean; error?: string }> {
+  logger?.debug(
+    'Email',
+    `Dispatching via provider: "${config.provider}" | From: "${config.from}" | To: "${config.to}" | SiteId: "${config.siteId || 'none'}"`
+  );
+
   if (config.provider === 'none') {
+    logger?.debug('Email', 'Skipped (provider is "none")');
     return { success: true }; // Skip if not configured
   }
 
@@ -44,24 +52,29 @@ export async function sendEmailNotification(
   }
 
   if (!config.apiKey || !config.to) {
+    logger?.warn(
+      'Email',
+      `Skipped: apiKey configured? ${!!config.apiKey}, to="${config.to}"`
+    );
     return { success: true };
   }
 
   try {
     switch (config.provider) {
       case 'resend':
-        return await sendViaResend(config, submission);
+        return await sendViaResend(config, submission, logger);
       case 'sendgrid':
-        return await sendViaSendGrid(config, submission);
+        return await sendViaSendGrid(config, submission, logger);
       case 'mailgun':
-        return await sendViaMailgun(config, submission);
+        return await sendViaMailgun(config, submission, logger);
       case 'mailtrap':
-        return await sendViaMailtrap(config, submission);
+        return await sendViaMailtrap(config, submission, logger);
       default:
+        logger?.error('Email', `Unknown email provider: "${config.provider}"`);
         return { success: false, error: 'Unknown email provider' };
     }
   } catch (error) {
-    console.error('Email notification error:', error);
+    logger?.error('Email', 'Email dispatch exception', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -107,8 +120,11 @@ ${JSON.stringify(sanitizedData, null, 2)}
  */
 async function sendViaResend(
   config: EmailConfig,
-  submission: FormSubmissionData
+  submission: FormSubmissionData,
+  logger?: Logger
 ): Promise<{ success: boolean; error?: string }> {
+  logger?.debug('Resend', `Request | From: "${config.from}" | To: "${config.to}"`);
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -124,11 +140,14 @@ async function sendViaResend(
     }),
   });
 
+  const responseText = await response.text();
+
   if (!response.ok) {
-    const error = await response.text();
-    return { success: false, error: `Resend error: ${error}` };
+    logger?.error('Resend', `API Error (${response.status}): ${responseText}`);
+    return { success: false, error: `Resend error (${response.status}): ${responseText}` };
   }
 
+  logger?.debug('Resend', `API Success (${response.status}): ${responseText}`);
   return { success: true };
 }
 
@@ -137,8 +156,11 @@ async function sendViaResend(
  */
 async function sendViaSendGrid(
   config: EmailConfig,
-  submission: FormSubmissionData
+  submission: FormSubmissionData,
+  logger?: Logger
 ): Promise<{ success: boolean; error?: string }> {
+  logger?.debug('SendGrid', `Request | From: "${config.from}" | To: "${config.to}"`);
+
   const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
     headers: {
@@ -168,9 +190,11 @@ async function sendViaSendGrid(
 
   if (!response.ok) {
     const error = await response.text();
+    logger?.error('SendGrid', `API Error (${response.status}): ${error}`);
     return { success: false, error: `SendGrid error: ${error}` };
   }
 
+  logger?.debug('SendGrid', `API Success (${response.status})`);
   return { success: true };
 }
 
@@ -179,11 +203,15 @@ async function sendViaSendGrid(
  */
 async function sendViaMailgun(
   config: EmailConfig,
-  submission: FormSubmissionData
+  submission: FormSubmissionData,
+  logger?: Logger
 ): Promise<{ success: boolean; error?: string }> {
   if (!config.mailgunDomain) {
+    logger?.error('Mailgun', 'Missing mailgunDomain in configuration');
     return { success: false, error: 'Mailgun domain is required' };
   }
+
+  logger?.debug('Mailgun', `Request | Domain: "${config.mailgunDomain}" | From: "${config.from}" | To: "${config.to}"`);
 
   const formData = new FormData();
   formData.append('from', config.from);
@@ -205,9 +233,11 @@ async function sendViaMailgun(
 
   if (!response.ok) {
     const error = await response.text();
+    logger?.error('Mailgun', `API Error (${response.status}): ${error}`);
     return { success: false, error: `Mailgun error: ${error}` };
   }
 
+  logger?.debug('Mailgun', `API Success (${response.status})`);
   return { success: true };
 }
 
@@ -217,7 +247,8 @@ async function sendViaMailgun(
  */
 async function sendViaMailtrap(
   config: EmailConfig,
-  submission: FormSubmissionData
+  submission: FormSubmissionData,
+  logger?: Logger
 ): Promise<{ success: boolean; error?: string }> {
   const isSandbox = !!config.mailtrapInboxId;
 
@@ -244,6 +275,8 @@ async function sendViaMailtrap(
     };
   }
 
+  logger?.debug('Mailtrap', `Request URL: ${url} | From: "${config.from}" | To: "${config.to}"`);
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -256,8 +289,10 @@ async function sendViaMailtrap(
   const responseText = await response.text();
 
   if (!response.ok) {
+    logger?.error('Mailtrap', `API Error (${response.status}): ${responseText}`);
     return { success: false, error: `Mailtrap error: ${responseText}` };
   }
 
+  logger?.debug('Mailtrap', `API Success (${response.status}): ${responseText}`);
   return { success: true };
 }

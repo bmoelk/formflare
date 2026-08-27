@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid';
+import { type Logger } from './logger';
 
 export interface FormSubmission {
     formId: string;
@@ -24,6 +25,7 @@ export async function storeSubmission(
     submission: FormSubmission,
     kv?: KVNamespace,
     db?: D1Database,
+    logger?: Logger
 ): Promise<string> {
     const submissionId = nanoid();
     const site = submission.siteId;
@@ -48,6 +50,7 @@ export async function storeSubmission(
                 submission.metadata.timestamp
             )
             .run();
+        logger?.debug('Storage', `Persisted submission ${submissionId} to D1`);
     } else if (kv) {
         // Multi-tenant hierarchical key: submission:<siteId>:<formId>:<submissionId>
         const key = `submission:${site}:${submission.formId}:${submissionId}`;
@@ -67,8 +70,13 @@ export async function storeSubmission(
         // Keep only last 1000 submissions in index
         const trimmedIndex = existingIndex.slice(0, 1000);
         await kv.put(indexKey, JSON.stringify(trimmedIndex));
+        logger?.debug('Storage', `Persisted submission ${submissionId} to KV key: ${key}`);
     } else {
-        console.warn('⚠️ No storage backend (KV or D1) bound. Submission processed without persistence.');
+        if (logger) {
+            logger.warn('Storage', 'No storage backend (KV or D1) bound. Submission processed without persistence.');
+        } else {
+            console.warn('⚠️ No storage backend (KV or D1) bound. Submission processed without persistence.');
+        }
     }
 
     return submissionId;

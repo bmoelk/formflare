@@ -3,13 +3,14 @@ import { cors } from 'hono/cors';
 import { verifyTurnstile } from './turnstile';
 import { storeSubmission, getSubmissions, getSubmission } from './storage';
 import { checkRateLimit } from './ratelimit';
-
 import { sendEmailNotification, type EmailConfig } from './email';
+import { createLogger, type Logger } from './logger';
 
 type Bindings = {
     KV?: KVNamespace;
     DB?: D1Database;
     ENVIRONMENT?: string;
+    LOG_LEVEL?: string;
     STORAGE_ENGINE?: string;
     DEV_MODE?: string;
     DEV_MOCK_TURNSTILE?: string;
@@ -65,15 +66,75 @@ export function resolveSiteEnv(
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// CORS middleware
+// CORS middleware with strict project-level subdomain matching and structured logging
 app.use('/*', async (c, next) => {
-    const allowedOrigins = (c.env.ALLOWED_ORIGINS || '*').split(',');
-    const origin = c.req.header('origin') || '*';
+    const logger = createLogger(c.env as Record<string, string | undefined>);
+    const rawAllowed = c.env.ALLOWED_ORIGINS || '*';
+    const allowedOrigins = rawAllowed
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
 
     const corsMiddleware = cors({
-        origin: allowedOrigins.includes('*') ? '*' : allowedOrigins,
+        origin: (requestOrigin) => {
+            if (!requestOrigin) return '*';
+            if (allowedOrigins.includes('*')) {
+                logger.debug('CORS', `ALLOWED (Wildcard *) | Origin: "${requestOrigin}"`);
+                return requestOrigin;
+            }
+
+            let reqHost = '';
+            try {
+                reqHost = new URL(requestOrigin).hostname.toLowerCase();
+            } catch {
+                logger.warn('CORS', `BLOCKED (Invalid Origin URL) | Origin: "${requestOrigin}"`);
+                return null;
+            }
+
+            for (const allowed of allowedOrigins) {
+                // Exact origin match (e.g. https://brainendeavor-staging.pages.dev)
+                if (allowed.toLowerCase() === requestOrigin.toLowerCase()) {
+                    logger.debug('CORS', `ALLOWED (Exact Match) | Origin: "${requestOrigin}" | Matched: "${allowed}"`);
+                    return requestOrigin;
+                }
+
+                // Project-specific subdomain matching (e.g., hash.brainendeavor-staging.pages.dev)
+                try {
+                    const allowedHost = new URL(allowed.startsWith('http') ? allowed : `https://${allowed}`).hostname.toLowerCase();
+
+                    // 1. Direct host match
+                    if (reqHost === allowedHost) {
+                        logger.debug('CORS', `ALLOWED (Host Match) | reqHost: "${reqHost}" | allowedHost: "${allowedHost}"`);
+                        return requestOrigin;
+                    }
+
+                    // 2. Specific project subdomains (e.g., *.brainendeavor-staging.pages.dev, but NOT arbitrary other pages.dev)
+                    if (reqHost.endsWith('.' + allowedHost)) {
+                        logger.debug('CORS', `ALLOWED (Project Subdomain Match) | reqHost: "${reqHost}" | allowedHost: "*.${allowedHost}"`);
+                        return requestOrigin;
+                    }
+
+                    // 3. Explicit wildcard pattern in allowedOrigins (e.g., *.splitphase.io)
+                    if (allowedHost.startsWith('*.')) {
+                        const rootDomain = allowedHost.slice(2);
+                        if (reqHost === rootDomain || reqHost.endsWith('.' + rootDomain)) {
+                            logger.debug('CORS', `ALLOWED (Wildcard Rule Match) | reqHost: "${reqHost}" | Rule: "${allowedHost}"`);
+                            return requestOrigin;
+                        }
+                    }
+                } catch {
+                    // Ignore unparseable configured origin
+                }
+            }
+
+            logger.warn(
+                'CORS',
+                `BLOCKED | reqHost: "${reqHost}" | Origin: "${requestOrigin}" | Allowed: [${allowedOrigins.join(', ')}]`
+            );
+            return null;
+        },
         allowMethods: ['GET', 'POST', 'OPTIONS'],
-        allowHeaders: ['Content-Type', 'Authorization'],
+        allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
         maxAge: 86400,
     });
 
@@ -96,6 +157,7 @@ app.get('/', (c) => {
         'RATE_LIMIT_WINDOW',
         'ALLOWED_ORIGINS',
         'ENVIRONMENT',
+        'LOG_LEVEL',
     ];
 
     const envObj = (c.env || {}) as Record<string, any>;
@@ -116,12 +178,14 @@ app.get('/', (c) => {
 
     const storageEngine = (c.env.STORAGE_ENGINE || (d1Bound ? 'd1' : kvBound ? 'kv' : 'none')).toLowerCase();
     const storageConfigured = storageEngine === 'd1' ? d1Bound : storageEngine === 'kv' ? kvBound : false;
+    const logger = createLogger(c.env as Record<string, string | undefined>);
 
     return c.json({
         service: 'FormFlare',
         version: '1.0.0',
         status: 'healthy',
         environment: c.env.ENVIRONMENT || 'production',
+        logLevel: logger.getLevel(),
         config: {
             storageEngine,
             storageConfigured,
@@ -140,10 +204,10 @@ app.get('/', (c) => {
     });
 });
 
-
-
 // Submit form endpoint
 app.post('/submit', async (c) => {
+    const logger = createLogger(c.env as Record<string, string | undefined>);
+
     try {
         const clientIP = c.req.header('cf-connecting-ip') || 'unknown';
 
@@ -155,7 +219,8 @@ app.post('/submit', async (c) => {
                 c.env.DB,
                 clientIP,
                 parseInt(c.env.RATE_LIMIT_REQUESTS || '10'),
-                parseInt(c.env.RATE_LIMIT_WINDOW || '60')
+                parseInt(c.env.RATE_LIMIT_WINDOW || '60'),
+                logger
             );
 
             if (!rateLimitResult.allowed) {
@@ -170,8 +235,61 @@ app.post('/submit', async (c) => {
             }
         }
 
-        const body = await c.req.json();
-        const { turnstileToken, formId, siteId, data } = body;
+        let turnstileToken = '';
+        let formId = '';
+        let siteId = '';
+        let data: Record<string, any> = {};
+
+        const contentType = c.req.header('content-type') || '';
+
+        if (contentType.includes('application/json')) {
+            try {
+                const body = await c.req.json();
+                turnstileToken = body.turnstileToken || body['cf-turnstile-response'] || '';
+                formId = body.formId || '';
+                siteId = body.siteId || '';
+                data = body.data || {};
+            } catch {
+                return c.json({ success: false, error: 'Malformed JSON payload' }, 400);
+            }
+        } else {
+            // Parse application/x-www-form-urlencoded or multipart/form-data
+            const body = await c.req.parseBody();
+            turnstileToken = (body['cf-turnstile-response'] as string) || (body['turnstileToken'] as string) || '';
+            formId = (body['formId'] as string) || (body['form_id'] as string) || (body['form'] as string) || 'contact';
+            siteId = (body['siteId'] as string) || (body['site_id'] as string) || (body['site'] as string) || '';
+
+            // Extract remaining form inputs as submission data
+            const extractedData: Record<string, any> = {};
+            const reserved = new Set([
+                'cf-turnstile-response',
+                'cf_turnstile_response',
+                'turnstileToken',
+                'turnstile_token',
+                'formId',
+                'form_id',
+                'form',
+                'siteId',
+                'site_id',
+                'site',
+            ]);
+            for (const [key, value] of Object.entries(body)) {
+                if (!reserved.has(key)) {
+                    extractedData[key] = value;
+                }
+            }
+            data = extractedData;
+        }
+
+        const isDevMock =
+            c.env.DEV_MOCK_TURNSTILE === 'true' ||
+            c.env.DEV_MODE === 'true' ||
+            c.env.ENVIRONMENT === 'development';
+
+        // In dev mock mode, auto-fill dev token if omitted
+        if (!turnstileToken && isDevMock) {
+            turnstileToken = 'dev';
+        }
 
         // Validate required fields
         if (!turnstileToken) {
@@ -218,11 +336,6 @@ app.post('/submit', async (c) => {
             );
         }
 
-        const isDevMock =
-            c.env.DEV_MOCK_TURNSTILE === 'true' ||
-            c.env.DEV_MODE === 'true' ||
-            c.env.ENVIRONMENT === 'development';
-
         const envRecord = c.env as Record<string, string | undefined>;
 
         // Dynamic Turnstile Secret Key resolution (supports domains, underscores, and global fallbacks):
@@ -233,7 +346,8 @@ app.post('/submit', async (c) => {
             turnstileToken,
             secretKey,
             clientIP,
-            isDevMock
+            isDevMock,
+            logger
         );
 
         if (!turnstileResult.success) {
@@ -267,17 +381,17 @@ app.post('/submit', async (c) => {
         let submissionId = '';
         if (storageEngine === 'd1') {
             if (!c.env.DB) {
-                console.error(`❌ STORAGE_ENGINE is set to 'd1', but D1 database binding 'DB' is missing in Wrangler!`);
+                logger.error('Storage', "STORAGE_ENGINE is set to 'd1', but D1 database binding 'DB' is missing in Wrangler!");
             }
-            submissionId = await storeSubmission(submissionData, undefined, c.env.DB);
+            submissionId = await storeSubmission(submissionData, undefined, c.env.DB, logger);
         } else if (storageEngine === 'kv') {
             if (!c.env.KV) {
-                console.error(`❌ STORAGE_ENGINE is set to 'kv', but KV namespace binding 'KV' is missing in Wrangler!`);
+                logger.error('Storage', "STORAGE_ENGINE is set to 'kv', but KV namespace binding 'KV' is missing in Wrangler!");
             }
-            submissionId = await storeSubmission(submissionData, c.env.KV, undefined);
+            submissionId = await storeSubmission(submissionData, c.env.KV, undefined, logger);
         } else {
             // 'none': process without persistence
-            submissionId = await storeSubmission(submissionData, undefined, undefined);
+            submissionId = await storeSubmission(submissionData, undefined, undefined, logger);
         }
 
         // Dynamic Per-Site Email & Webhook Resolution (supports domains, prefixes, and global fallbacks):
@@ -301,16 +415,26 @@ app.post('/submit', async (c) => {
 
         if (emailConfig.provider !== 'none') {
             if (!emailConfig.to || !emailConfig.from) {
-                console.warn('⚠️ Email notification skipped: EMAIL_TO or EMAIL_FROM is missing.');
+                logger.warn('Email', `Skipped: Missing EMAIL_TO ("${emailConfig.to}") or EMAIL_FROM ("${emailConfig.from}") for siteId: "${resolvedSiteId}"`);
             } else {
                 const emailPromise = sendEmailNotification(emailConfig, {
                     ...submissionData,
                     submissionId,
-                }).catch((error) => {
-                    console.error('Email notification failed:', error);
-                });
+                }, logger)
+                    .then((result) => {
+                        if (result && !result.success) {
+                            logger.error('Email', `Dispatch failed: ${result.error}`);
+                        } else {
+                            logger.info('Email', `Dispatch complete for site "${resolvedSiteId}" via ${emailConfig.provider}`);
+                        }
+                    })
+                    .catch((error) => {
+                        logger.error('Email', 'Dispatch exception', error);
+                    });
                 c.executionCtx.waitUntil(emailPromise);
             }
+        } else {
+            logger.debug('Email', `Provider resolved to "none" for siteId: "${resolvedSiteId}"`);
         }
 
         // Send webhook (if configured)
@@ -330,13 +454,15 @@ app.post('/submit', async (c) => {
                     timestamp: new Date().toISOString()
                 })
             }).then(res => {
-                if (!res.ok) console.error(`Webhook failed: ${res.status} ${res.statusText}`);
+                if (!res.ok) logger.error('Webhook', `Webhook failed with status: ${res.status} ${res.statusText}`);
             }).catch(err => {
-                console.error('Webhook error:', err);
+                logger.error('Webhook', 'Webhook dispatch exception', err);
             });
 
             c.executionCtx.waitUntil(webhookPromise);
         }
+
+        logger.info('Submit', `Processed submission ${submissionId} for site "${resolvedSiteId}"`);
 
         return c.json({
             success: true,
@@ -344,7 +470,7 @@ app.post('/submit', async (c) => {
             message: 'Form submitted successfully',
         });
     } catch (error) {
-        console.error('Error processing form submission:', error);
+        logger.error('Submit', 'Unhandled error processing form submission', error);
         return c.json(
             {
                 success: false,
@@ -357,6 +483,8 @@ app.post('/submit', async (c) => {
 
 // Get all submissions for a form (requires authentication)
 app.get('/submissions/:formId', async (c) => {
+    const logger = createLogger(c.env as Record<string, string | undefined>);
+
     try {
         // Authentication
         const apiKey = c.env.API_KEY;
@@ -410,7 +538,7 @@ app.get('/submissions/:formId', async (c) => {
             },
         });
     } catch (error) {
-        console.error('Error fetching submissions:', error);
+        logger.error('API', 'Error fetching submissions', error);
         return c.json(
             {
                 success: false,
@@ -423,6 +551,8 @@ app.get('/submissions/:formId', async (c) => {
 
 // Get a specific submission (requires authentication)
 app.get('/submission/:id', async (c) => {
+    const logger = createLogger(c.env as Record<string, string | undefined>);
+
     try {
         // Authentication
         const apiKey = c.env.API_KEY;
@@ -462,7 +592,7 @@ app.get('/submission/:id', async (c) => {
             submission,
         });
     } catch (error) {
-        console.error('Error fetching submission:', error);
+        logger.error('API', 'Error fetching submission', error);
         return c.json(
             {
                 success: false,
@@ -475,6 +605,8 @@ app.get('/submission/:id', async (c) => {
 
 // Test email configuration (requires authentication)
 app.post('/email-test', async (c) => {
+    const logger = createLogger(c.env as Record<string, string | undefined>);
+
     try {
         // Authentication
         const apiKey = c.env.API_KEY;
@@ -514,7 +646,7 @@ app.post('/email-test', async (c) => {
         };
 
         // Send email
-        const result = await sendEmailNotification(emailConfig, submissionData);
+        const result = await sendEmailNotification(emailConfig, submissionData, logger);
 
         if (result.success) {
             return c.json({
@@ -531,7 +663,7 @@ app.post('/email-test', async (c) => {
         }
 
     } catch (error) {
-        console.error('Error sending test email:', error);
+        logger.error('API', 'Error sending test email', error);
         return c.json(
             {
                 success: false,

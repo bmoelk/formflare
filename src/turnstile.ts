@@ -1,3 +1,5 @@
+import { type Logger } from './logger';
+
 /**
  * Verify Cloudflare Turnstile token
  */
@@ -5,7 +7,8 @@ export async function verifyTurnstile(
     token: string,
     secretKey: string,
     remoteIP: string,
-    isDevMock: boolean = false
+    isDevMock: boolean = false,
+    logger?: Logger
 ): Promise<{
     success: boolean;
     score?: number;
@@ -18,7 +21,11 @@ export async function verifyTurnstile(
         token === '1x00000000000000000000AA' ||
         secretKey === '1x00000000000000000000AA00000000000'
     ) {
-        console.log('⚡ [FormFlare Turnstile] Dev Mock Verification Auto-Passed');
+        if (logger) {
+            logger.debug('Turnstile', '⚡ Dev Mock Verification Auto-Passed');
+        } else {
+            console.log('⚡ [FormFlare Turnstile] Dev Mock Verification Auto-Passed');
+        }
         return {
             success: true,
             score: 1.0,
@@ -47,13 +54,21 @@ export async function verifyTurnstile(
             hostname?: string;
         };
 
+        if (!result.success && logger) {
+            logger.warn('Turnstile', `Verification failed with errors: ${result['error-codes']?.join(', ')}`);
+        }
+
         return {
             success: result.success,
             score: result.score,
             errors: result['error-codes'],
         };
     } catch (error) {
-        console.error('Turnstile verification error:', error);
+        if (logger) {
+            logger.error('Turnstile', 'Turnstile siteverify API exception', error);
+        } else {
+            console.error('Turnstile verification error:', error);
+        }
         return {
             success: false,
             errors: ['verification-failed'],

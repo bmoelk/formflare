@@ -9,8 +9,16 @@
       "kind": "Var",
       "required": false,
       "default": "production",
-      "description": "Deployment mode (development / production).",
-      "options": ["development", "production"]
+      "description": "Deployment mode (development / staging / production).",
+      "options": ["development", "staging", "production"]
+    },
+    {
+      "name": "LOG_LEVEL",
+      "kind": "Var",
+      "required": false,
+      "default": "warn",
+      "description": "Logging verbosity level (debug, info, warn, error, none). Inferred from ENVIRONMENT if omitted (production=warn, staging=info, development=debug).",
+      "options": ["debug", "info", "warn", "error", "none"]
     },
     {
       "name": "ALLOWED_ORIGINS",

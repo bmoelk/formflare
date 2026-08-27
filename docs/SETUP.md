@@ -111,22 +111,72 @@ wrangler secret put TURNSTILE_SECRET_KEY
 
 2. Deploy the worker:
 ```bash
-npm run deploy
+npm run deploy:prod
+# or: npx wrangler deploy -c wrangler.overrides.toml
 ```
 
-3. Note your worker URL (e.g., `https://formflare.your-subdomain.workers.dev`)
+3. Note your worker URL (e.g., `https://formflare.your-subdomain.workers.dev` or custom domain).
 
-## Step 7: Integrate with Your Website
+## Step 7: Configure Custom Domains & Multi-Site Routes (Optional)
+
+FormFlare supports routing multiple websites and custom domains into a single Worker instance. This allows you to centralize form processing while keeping forms branded under each site's own domain.
+
+### Option A: Custom Domains (Recommended)
+
+You can assign dedicated subdomains (e.g., `contact.splitphase.io`, `contact.brainendeavor.com`) directly to your Worker. Cloudflare automatically handles DNS provisioning and SSL/TLS certificates.
+
+Add the `routes` array to `wrangler.overrides.toml`:
+
+```toml
+# wrangler.overrides.toml
+
+routes = [
+  { pattern = "contact.splitphase.io", custom_domain = true },
+  { pattern = "contact.brainendeavor.com", custom_domain = true },
+  { pattern = "contact.drawdown.pro", custom_domain = true }
+]
+```
+
+> [!NOTE]
+> **Why does Wrangler warn about removing routes during deploy?**
+> When you run `wrangler deploy`, Wrangler compares the routes currently assigned to your Worker in Cloudflare against the routes declared in your deployment configuration file (`wrangler.overrides.toml`). If a custom domain was configured previously or in the Cloudflare Dashboard but is omitted from your local config, Wrangler will warn that it is scheduled for removal. Adding all active custom domains to the `routes` array in `wrangler.overrides.toml` prevents accidental detachment.
+
+### Option B: Zone Path Routes (Same-Origin)
+
+If your website apex domains are proxied through Cloudflare DNS (Orange Clouded), you can route a subpath directly to the FormFlare worker:
+
+```toml
+# wrangler.overrides.toml
+
+routes = [
+  { pattern = "splitphase.io/api/contact*", zone_name = "splitphase.io" },
+  { pattern = "brainendeavor.com/api/contact*", zone_name = "brainendeavor.com" }
+]
+```
+
+**Benefits of Same-Origin Path Routes:**
+- Frontend JavaScript `fetch()` calls to `/api/contact/submit` are completely same-origin—no CORS preflight requests or CORS configuration required.
+
+### Multi-Domain CORS Considerations
+
+- **Standard HTML Form Submissions (`<form action="..." method="POST">`)**: Native browser form submissions do not enforce CORS restrictions. Forms from any domain can post directly to your custom domain or `*.workers.dev` endpoint.
+- **JavaScript `fetch()` / AJAX Submissions**: When making cross-origin `fetch()` requests (including from `brainendeavor.com` to `contact.brainendeavor.com`), ensure all submitting origins are included in `ALLOWED_ORIGINS`:
+  ```toml
+  [vars]
+  ALLOWED_ORIGINS = "https://splitphase.io,https://www.splitphase.io,https://brainendeavor.com"
+  ```
+
+## Step 8: Integrate with Your Website
 
 1. Open `examples/example.html` in your editor
 
 2. Update the configuration:
    - Replace `YOUR_TURNSTILE_SITE_KEY` with your Turnstile site key
-   - Replace `https://your-worker.workers.dev/submit` with your actual worker URL
+   - Replace `https://your-worker.workers.dev/submit` with your actual worker URL (or custom domain `https://contact.yourdomain.com/submit`)
 
 3. Upload `examples/example.html` to your static hosting (GitHub Pages, Netlify, etc.)
 
-## Step 8: Environment Variables & Secrets Reference List
+## Step 9: Environment Variables & Secrets Reference List
 
 All configuration parameters and secrets supported by FormFlare are summarized below. You can specify non-sensitive environment variables in `.dev.vars` (or Cloudflare Dashboard), and sensitive secrets via `npx wrangler secret put KEY_NAME`.
 
@@ -134,7 +184,8 @@ All configuration parameters and secrets supported by FormFlare are summarized b
 
 | Variable / Secret Name | Kind | Required? | Default | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `ENVIRONMENT` | Var | Optional | `production` | Deployment mode (development / production). |
+| `ENVIRONMENT` | Var | Optional | `production` | Deployment mode (development / staging / production). |
+| `LOG_LEVEL` | Var | Optional | `warn` | Logging verbosity level (debug, info, warn, error, none). Inferred from ENVIRONMENT if omitted (production=warn, staging=info, development=debug). |
 | `ALLOWED_ORIGINS` | Var | Optional | `*` | Comma-separated list of allowed CORS origins (e.g. https://example.com,https://staging.example.com). |
 | `RATE_LIMIT_ENABLED` | Var | Optional | `false` | Enable/disable IP rate limiting (true / false). |
 | `RATE_LIMIT_REQUESTS` | Var | Optional | `10` | Max requests allowed per rate limit window per IP. |
@@ -164,7 +215,7 @@ All configuration parameters and secrets supported by FormFlare are summarized b
 2. **Wrangler KMS Secrets (`npx wrangler secret put`)**: Required for sensitive secrets (`TURNSTILE_SECRET_KEY_*`, `EMAIL_API_KEY`, `API_KEY`).
 3. **`wrangler.toml`**: Public open-source template defaults only. Never put private email addresses or API keys in `wrangler.toml`.
 
-## Step 9: Set Up Authentication for Admin Endpoints
+## Step 10: Set Up Authentication for Admin Endpoints
 
 The `/submissions/:formId` and `/submission/:id` endpoints require authentication.
 
@@ -185,7 +236,7 @@ curl -H "Authorization: Bearer your-api-key" \
   https://your-worker.workers.dev/submissions/contact-form
 ```
 
-## Step 10: Configure Webhooks (Optional)
+## Step 11: Configure Webhooks (Optional)
 
 You can configure FormFlare to send a JSON POST request to a webhook URL whenever a form is submitted successfully.
 

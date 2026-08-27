@@ -42,6 +42,11 @@ function loadManifest() {
 function getLocalConfig() {
   const localKeys = new Set();
   const localKeyValues = {};
+  const plaintextSecretViolations = [];
+
+  // Known secret key patterns that must NEVER be in [vars]
+  const isSecretKey = (key) => /^(?:TURNSTILE_SECRET_KEY|API_KEY)(?:_[A-Z0-9_]+)?$/.test(key);
+  const isFrontendOnlyKey = (key) => /^TURNSTILE_SITE_KEY(?:_[A-Z0-9_]+)?$/.test(key);
 
   // 1. Read .dev.vars
   const devVarsPath = path.join(__dirname, '..', '.dev.vars');
@@ -50,8 +55,11 @@ function getLocalConfig() {
     for (const line of lines) {
       const match = line.trim().match(/^([A-Za-z0-9_]+)\s*=\s*(.*)$/);
       if (match && !match[1].startsWith('#')) {
-        localKeys.add(match[1]);
-        localKeyValues[match[1]] = match[2].trim().replace(/^["']|["']$/g, '');
+        const key = match[1];
+        if (!isFrontendOnlyKey(key)) {
+          localKeys.add(key);
+        }
+        localKeyValues[key] = match[2].trim().replace(/^["']|["']$/g, '');
       }
     }
   }
@@ -75,8 +83,15 @@ function getLocalConfig() {
       if (inVars) {
         const match = trimmed.match(/^([A-Za-z0-9_]+)\s*=\s*(.*)$/);
         if (match && !match[1].startsWith('#')) {
-          localKeys.add(match[1]);
-          localKeyValues[match[1]] = match[2].trim().replace(/^["']|["']$/g, '');
+          const key = match[1];
+          if (isSecretKey(key)) {
+            plaintextSecretViolations.push(key);
+          } else if (isFrontendOnlyKey(key)) {
+            plaintextSecretViolations.push(`${key} (Frontend Site Key not needed in Worker)`);
+          } else {
+            localKeys.add(key);
+          }
+          localKeyValues[key] = match[2].trim().replace(/^["']|["']$/g, '');
         }
       }
     }
@@ -97,6 +112,7 @@ function getLocalConfig() {
   return {
     keys: Array.from(localKeys),
     values: localKeyValues,
+    plaintextSecretViolations,
   };
 }
 
@@ -246,7 +262,17 @@ async function verifyDeployment() {
       }
     }
 
-    // 6. Cross-Reference Local vs Remote Environment Keys
+    // 6. Check for Security Violations in [vars]
+    if (local.plaintextSecretViolations.length > 0) {
+      console.log(`------------------------------------------------------------------------`);
+      console.log(`🔒 Security Audit: Plaintext Secrets in wrangler.overrides.toml`);
+      for (const item of local.plaintextSecretViolations) {
+        console.log(`  • ❌ CRITICAL: '${item}' found under [vars]!`);
+        warnings.push(`Plaintext Secret Violation: '${item}' is under [vars] in wrangler.overrides.toml. Remove it from [vars] and use: npx wrangler secret put ${item.split(' ')[0]}`);
+      }
+    }
+
+    // 7. Cross-Reference Local vs Remote Environment Keys
     if (local.keys.length > 0 && config.configuredKeys) {
       console.log(`------------------------------------------------------------------------`);
       console.log(`Local vs. Remote Key Provisioning Check:`);
