@@ -1,4 +1,4 @@
--- D1 Database Schema for FormFlare
+-- D1 Database Schema for FreeFormer
 
 CREATE TABLE IF NOT EXISTS submissions (
     id TEXT PRIMARY KEY,

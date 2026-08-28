@@ -1,5 +1,5 @@
 /**
- * FormFlare Edge Logger
+ * FreeFormer Edge Logger
  * Lightweight, zero-dependency structured logger with configurable log levels
  * and Cloudflare Workers Observability integration.
  */

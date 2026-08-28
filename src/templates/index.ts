@@ -1,5 +1,5 @@
 /**
- * FormFlare Mustache Email Template Renderer
+ * FreeFormer Mustache Email Template Renderer
  * Imports .mustache files directly as the single source of truth.
  */
 

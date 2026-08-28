@@ -1,11 +1,11 @@
 /**
- * FormFlare Client Library
+ * FreeFormer Client Library
  * Easy integration for form submissions with Turnstile verification
  * 
  * Usage:
  * <script src="https://your-worker.workers.dev/form-handler.js"></script>
  * <script>
- *   FormFlare.init({
+ *   FreeFormer.init({
  *     workerUrl: 'https://your-worker.workers.dev',
  *     turnstileSiteKey: 'YOUR_SITE_KEY'
  *   });
@@ -15,7 +15,7 @@
 (function (window) {
     'use strict';
 
-    const FormFlare = {
+    const FreeFormer = {
         config: {
             workerUrl: '',
             siteId: '',
@@ -25,14 +25,14 @@
         },
 
         /**
-         * Initialize FormFlare
+         * Initialize FreeFormer
          * @param {Object} options - Configuration options
          */
         init: function (options) {
             this.config = { ...this.config, ...options };
 
             if (this.config.debug) {
-                console.log('FormFlare initialized with config:', this.config);
+                console.log('FreeFormer initialized with config:', this.config);
             }
 
             // Load Turnstile script if not already loaded
@@ -66,12 +66,12 @@
         },
 
         /**
-         * Auto-initialize forms with data-formflare attribute
+         * Auto-initialize forms with data-freeformer attribute
          */
         autoInitForms: function () {
-            const forms = document.querySelectorAll('[data-formflare]');
+            const forms = document.querySelectorAll('[data-freeformer]');
             forms.forEach(form => {
-                const formId = form.dataset.formflare || form.id || 'default-form';
+                const formId = form.dataset.freeformer || form.id || 'default-form';
                 this.attachForm(form, formId);
             });
 
@@ -81,7 +81,7 @@
         },
 
         /**
-         * Attach FormFlare to a specific form
+         * Attach FreeFormer to a specific form
          * @param {HTMLFormElement|string} form - Form element or selector
          * @param {string} formId - Unique form identifier
          */
@@ -89,7 +89,7 @@
             const formElement = typeof form === 'string' ? document.querySelector(form) : form;
 
             if (!formElement) {
-                console.error('FormFlare: Form not found');
+                console.error('FreeFormer: Form not found');
                 return;
             }
 
@@ -114,7 +114,7 @@
          */
         addTurnstileWidget: function (form) {
             const container = document.createElement('div');
-            container.className = 'formflare-turnstile-container';
+            container.className = 'freeformer-turnstile-container';
             container.style.margin = '20px 0';
             container.style.display = 'flex';
             container.style.justifyContent = 'center';
@@ -178,7 +178,7 @@
                 }
 
                 // Resolve siteId: explicit dataset/config -> auto-extract hostname from window.location
-                const explicitSiteId = form.dataset.formflareSite || form.dataset.siteId || this.config.siteId;
+                const explicitSiteId = form.dataset.freeformerSite || form.dataset.siteId || this.config.siteId;
                 let autoSiteId = '';
                 if (typeof window !== 'undefined' && window.location && window.location.hostname) {
                     autoSiteId = window.location.hostname.replace(/^www\./i, '').toLowerCase();
@@ -186,13 +186,13 @@
                 const siteId = (explicitSiteId || autoSiteId || '').trim();
 
                 if (!siteId) {
-                    const errorMsg = 'FormFlare: Missing required site ID. Add data-formflare-site="mysite" to your <form> or set siteId in FormFlare.init().';
+                    const errorMsg = 'FreeFormer: Missing required site ID. Add data-freeformer-site="mysite" to your <form> or set siteId in FreeFormer.init().';
                     console.error(errorMsg);
                     this.showMessage(form, 'Configuration error: Missing site ID', 'error');
                     return;
                 }
 
-                // Submit to FormFlare
+                // Submit to FreeFormer
                 const response = await fetch(`${this.config.workerUrl}/submit`, {
                     method: 'POST',
                     headers: {
@@ -214,7 +214,7 @@
                     this.resetTurnstile(form);
 
                     // Trigger custom event
-                    form.dispatchEvent(new CustomEvent('formflare:success', {
+                    form.dispatchEvent(new CustomEvent('freeformer:success', {
                         detail: { submissionId: result.submissionId, formId: formId }
                     }));
                 } else {
@@ -226,17 +226,17 @@
                     this.resetTurnstile(form);
 
                     // Trigger custom event
-                    form.dispatchEvent(new CustomEvent('formflare:error', {
+                    form.dispatchEvent(new CustomEvent('freeformer:error', {
                         detail: { error: errorMsg, formId: formId }
                     }));
                 }
             } catch (error) {
-                console.error('FormFlare submission error:', error);
+                console.error('FreeFormer submission error:', error);
                 this.showMessage(form, 'Network error. Please try again.', 'error');
                 this.resetTurnstile(form);
 
                 // Trigger custom event
-                form.dispatchEvent(new CustomEvent('formflare:error', {
+                form.dispatchEvent(new CustomEvent('freeformer:error', {
                     detail: { error: error.message, formId: formId }
                 }));
             } finally {
@@ -292,18 +292,18 @@
          */
         showMessage: function (form, message, type) {
             // Look for existing message container
-            let messageDiv = form.querySelector('.formflare-message');
+            let messageDiv = form.querySelector('.freeformer-message');
 
             if (!messageDiv) {
                 // Create message container
                 messageDiv = document.createElement('div');
-                messageDiv.className = 'formflare-message';
+                messageDiv.className = 'freeformer-message';
                 form.insertBefore(messageDiv, form.firstChild);
             }
 
             // Style the message
             messageDiv.textContent = message;
-            messageDiv.className = `formflare-message formflare-message-${type}`;
+            messageDiv.className = `freeformer-message freeformer-message-${type}`;
             messageDiv.style.padding = '12px 16px';
             messageDiv.style.borderRadius = '8px';
             messageDiv.style.marginBottom = '16px';
@@ -328,6 +328,6 @@
     };
 
     // Expose to window
-    window.FormFlare = FormFlare;
+    window.FreeFormer = FreeFormer;
 
 })(window);

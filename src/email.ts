@@ -99,7 +99,7 @@ function sendViaConsole(
 
   console.log(`
 ┌────────────────────────────────────────────────────────────────────────┐
-│ 📧 [FormFlare Dev Email Logger]                                       │
+│ 📧 [FreeFormer Dev Email Logger]                                       │
 ├────────────────────────────────────────────────────────────────────────┤
 │ Form ID:        ${submission.formId}
 │ Site ID:        ${submission.siteId || 'none'}

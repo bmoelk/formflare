@@ -1,6 +1,6 @@
-# FormFlare Setup Guide
+# FreeFormer Setup Guide
 
-This guide will walk you through setting up FormFlare from scratch.
+This guide will walk you through setting up FreeFormer from scratch.
 
 ## Prerequisites
 
@@ -11,7 +11,7 @@ This guide will walk you through setting up FormFlare from scratch.
 ## Step 1: Install Dependencies
 
 ```bash
-cd formflare
+cd freeformer
 npm install
 ```
 
@@ -66,12 +66,12 @@ id = "your-kv-namespace-id"
 
 1. Create a D1 database:
 ```bash
-npx wrangler d1 create formflare-db
+npx wrangler d1 create freeformer-db
 ```
 
 2. Initialize the database schema:
 ```bash
-npx wrangler d1 execute formflare-db --remote --file=./schema.sql
+npx wrangler d1 execute freeformer-db --remote --file=./schema.sql
 ```
 
 3. Add the binding and storage engine to your `wrangler.overrides.toml`:
@@ -81,11 +81,11 @@ STORAGE_ENGINE = "d1"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "formflare-db"
+database_name = "freeformer-db"
 database_id = "your-d1-database-uuid"
 ```
 
-*(FormFlare automatically partitions submissions in D1 across multiple tenants via the `site_id` column and `idx_site_form_created_at` index).*
+*(FreeFormer automatically partitions submissions in D1 across multiple tenants via the `site_id` column and `idx_site_form_created_at` index).*
 
 ## Step 5: Test Locally
 
@@ -115,11 +115,11 @@ npm run deploy:prod
 # or: npx wrangler deploy -c wrangler.overrides.toml
 ```
 
-3. Note your worker URL (e.g., `https://formflare.your-subdomain.workers.dev` or custom domain).
+3. Note your worker URL (e.g., `https://freeformer.your-subdomain.workers.dev` or custom domain).
 
 ## Step 7: Configure Custom Domains & Multi-Site Routes (Optional)
 
-FormFlare supports routing multiple websites and custom domains into a single Worker instance. This allows you to centralize form processing while keeping forms branded under each site's own domain.
+FreeFormer supports routing multiple websites and custom domains into a single Worker instance. This allows you to centralize form processing while keeping forms branded under each site's own domain.
 
 ### Option A: Custom Domains (Recommended)
 
@@ -143,7 +143,7 @@ routes = [
 
 ### Option B: Zone Path Routes (Same-Origin)
 
-If your website apex domains are proxied through Cloudflare DNS (Orange Clouded), you can route a subpath directly to the FormFlare worker:
+If your website apex domains are proxied through Cloudflare DNS (Orange Clouded), you can route a subpath directly to the FreeFormer worker:
 
 ```toml
 # wrangler.overrides.toml
@@ -178,7 +178,7 @@ routes = [
 
 ## Step 9: Environment Variables & Secrets Reference List
 
-All configuration parameters and secrets supported by FormFlare are summarized below. You can specify non-sensitive environment variables in `.dev.vars` (or Cloudflare Dashboard), and sensitive secrets via `npx wrangler secret put KEY_NAME`.
+All configuration parameters and secrets supported by FreeFormer are summarized below. You can specify non-sensitive environment variables in `.dev.vars` (or Cloudflare Dashboard), and sensitive secrets via `npx wrangler secret put KEY_NAME`.
 
 <!-- CONFIG_TABLE_START -->
 
@@ -238,7 +238,7 @@ curl -H "Authorization: Bearer your-api-key" \
 
 ## Step 11: Configure Webhooks (Optional)
 
-You can configure FormFlare to send a JSON POST request to a webhook URL whenever a form is submitted successfully.
+You can configure FreeFormer to send a JSON POST request to a webhook URL whenever a form is submitted successfully.
 
 1. Set the webhook URL:
 ```bash
@@ -258,8 +258,8 @@ The webhook payload will look like this:
 ```
 
 Headers included:
-- `X-FormFlare-Event`: `submission`
-- `X-FormFlare-Signature`: Your `API_KEY` (if configured)
+- `X-FreeFormer-Event`: `submission`
+- `X-FreeFormer-Signature`: Your `API_KEY` (if configured)
 
 ## Testing Your Setup
 
@@ -309,7 +309,7 @@ And check the configured email inbox for the test message.
 
 ## Pre-Commit Quality Gate & Security Scanner
 
-FormFlare includes an automated pre-commit quality gate (`npm run pre-commit` / `bash scripts/scan-secrets.sh`) that verifies staged files before committing:
+FreeFormer includes an automated pre-commit quality gate (`npm run pre-commit` / `bash scripts/scan-secrets.sh`) that verifies staged files before committing:
 
 1. **Documentation & Manifest Sync (`npm run check-docs`)**: Verifies that the Environment Variables table above matches `config-manifest.json` exactly. Run `npm run sync-docs` to re-sync if drifted.
 2. **Private Configuration Files**: Prevents accidental staging of `.dev.vars`, `wrangler.overrides.toml`, or `wrangler.local.toml`.
@@ -323,7 +323,7 @@ npm run pre-commit
 
 ## Post-Deployment Verification & Key Cross-Referencing
 
-After deploying to Cloudflare (`npm run deploy:prod` / `npx wrangler deploy -c wrangler.overrides.toml`), FormFlare automatically runs `scripts/verify-deploy.js` to execute live health checks:
+After deploying to Cloudflare (`npm run deploy:prod` / `npx wrangler deploy -c wrangler.overrides.toml`), FreeFormer automatically runs `scripts/verify-deploy.js` to execute live health checks:
 
 1. **Live Binding Diagnostics (`GET /`)**: Queries the deployed Worker to verify that KV/D1 storage is active, Turnstile secrets are configured, and email providers are recognized.
 2. **Local vs. Remote Key Cross-Referencing**:

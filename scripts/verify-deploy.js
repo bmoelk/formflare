@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * FormFlare Post-Deployment Verification & Health Diagnostic Script
+ * FreeFormer Post-Deployment Verification & Health Diagnostic Script
  * Automatically queries the deployed Worker, verifies active bindings and secrets,
  * and cross-references local overrides (.dev.vars / wrangler.overrides.toml) against
  * the remote deployment with full multi-tenant site consistency checks.
@@ -12,7 +12,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULT_URL = process.env.WORKER_URL || 'https://formflare.bmoelk.workers.dev';
+const DEFAULT_URL = process.env.WORKER_URL || 'https://freeformer.bmoelk.workers.dev';
 const MANIFEST_PATH = path.join(__dirname, '..', 'config-manifest.json');
 
 async function fetchJson(url) {
@@ -121,7 +121,7 @@ async function verifyDeployment() {
   const manifest = loadManifest();
 
   console.log(`\n========================================================================`);
-  console.log(`🔍 FormFlare Post-Deployment Health & Consistency Verification`);
+  console.log(`🔍 FreeFormer Post-Deployment Health & Consistency Verification`);
   console.log(`========================================================================`);
   console.log(`Target Worker:   ${targetUrl}`);
 

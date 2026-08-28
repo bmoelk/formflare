@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# FormFlare Test Script
-# This script tests the FormFlare worker endpoints
+# FreeFormer Test Script
+# This script tests the FreeFormer worker endpoints
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 # Configuration
 WORKER_URL="${1:-http://localhost:8787}"
 
-echo "Testing FormFlare Worker at: $WORKER_URL"
+echo "Testing FreeFormer Worker at: $WORKER_URL"
 echo "=========================================="
 echo ""
 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FormFlare Example - Using Client Library</title>
+    <title>FreeFormer Example - Using Client Library</title>
     <style>
         * {
             margin: 0;
@@ -126,15 +126,15 @@
 
 <body>
     <div class="container">
-        <span class="badge">Using FormFlare Client Library</span>
+        <span class="badge">Using FreeFormer Client Library</span>
         <h1>Contact Us</h1>
-        <p class="subtitle">This form uses the FormFlare client library for easy integration.</p>
+        <p class="subtitle">This form uses the FreeFormer client library for easy integration.</p>
 
         <!-- 
-            The form has data-formflare and data-formflare-site attributes 
-            which automatically initialize it with the FormFlare library 
+            The form has data-freeformer and data-freeformer-site attributes 
+            which automatically initialize it with the FreeFormer library 
         -->
-        <form id="contact-form" data-formflare="contact-form" data-formflare-site="mysite">
+        <form id="contact-form" data-freeformer="contact-form" data-freeformer-site="mysite">
             <div class="form-group">
                 <label for="name">Name <span class="required">*</span></label>
                 <input type="text" id="name" name="name" required placeholder="John Doe">
@@ -161,28 +161,28 @@
         </form>
     </div>
 
-    <!-- Load FormFlare client library from your worker -->
+    <!-- Load FreeFormer client library from your worker -->
     <script src="https://your-worker.workers.dev/form-handler.js"></script>
 
-    <!-- Initialize FormFlare -->
+    <!-- Initialize FreeFormer -->
     <script>
-        // Initialize FormFlare with your configuration
-        FormFlare.init({
+        // Initialize FreeFormer with your configuration
+        FreeFormer.init({
             workerUrl: 'https://your-worker.workers.dev',
             siteId: 'mysite',
             turnstileSiteKey: 'YOUR_TURNSTILE_SITE_KEY',
-            autoInit: true,  // Automatically initialize forms with data-formflare attribute
+            autoInit: true,  // Automatically initialize forms with data-freeformer attribute
             debug: true      // Enable debug logging (set to false in production)
         });
 
         // Optional: Listen to custom events
-        document.getElementById('contact-form').addEventListener('formflare:success', (e) => {
+        document.getElementById('contact-form').addEventListener('freeformer:success', (e) => {
             console.log('Form submitted successfully!', e.detail);
             // You can add custom success handling here
             // e.g., redirect to a thank you page, show a modal, etc.
         });
 
-        document.getElementById('contact-form').addEventListener('formflare:error', (e) => {
+        document.getElementById('contact-form').addEventListener('freeformer:error', (e) => {
             console.error('Form submission failed:', e.detail);
             // You can add custom error handling here
         });

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FormFlare Example - Contact Form</title>
+    <title>FreeFormer Example - Contact Form</title>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         * {
@@ -195,8 +195,8 @@
         const submitBtn = document.getElementById('submit-btn');
         const messageDiv = document.getElementById('message');
 
-        // Replace with your FormFlare worker URL and IDs
-        const FORMFLARE_URL = 'https://your-worker.workers.dev/submit';
+        // Replace with your FreeFormer worker URL and IDs
+        const FREEFORMER_URL = 'https://your-worker.workers.dev/submit';
         const FORM_ID = 'contact-form';
         const SITE_ID = 'mysite';
 
@@ -230,8 +230,8 @@
                     return;
                 }
 
-                // Submit to FormFlare
-                const response = await fetch(FORMFLARE_URL, {
+                // Submit to FreeFormer
+                const response = await fetch(FREEFORMER_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

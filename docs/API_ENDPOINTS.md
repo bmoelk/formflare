@@ -1,6 +1,6 @@
-# FormFlare API Endpoints Reference 📡
+# FreeFormer API Endpoints Reference 📡
 
-This document provides complete, detailed specifications for all REST API endpoints exposed by the FormFlare Worker.
+This document provides complete, detailed specifications for all REST API endpoints exposed by the FreeFormer Worker.
 
 ---
 
@@ -9,7 +9,7 @@ This document provides complete, detailed specifications for all REST API endpoi
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
 | `GET` | [`/`](#get-) | Service health check & metadata | None |
-| `GET` | [`/form-handler.js`](#get-form-handlerjs) | FormFlare Client JavaScript library script | None |
+| `GET` | [`/form-handler.js`](#get-form-handlerjs) | FreeFormer Client JavaScript library script | None |
 | `POST` | [`/submit`](#post-submit) | Ingest form submission with Turnstile validation | None (Turnstile token) |
 | `GET` | [`/submissions/:formId`](#get-submissionsformid) | List paginated submissions for a specific form | `Bearer API_KEY` |
 | `GET` | [`/submission/:id`](#get-submissionid) | Retrieve details for a single submission by ID | `Bearer API_KEY` |
@@ -32,7 +32,7 @@ Host: your-worker.workers.dev
 #### Response (`200 OK`)
 ```json
 {
-  "service": "FormFlare",
+  "service": "FreeFormer",
   "version": "1.0.0",
   "status": "healthy",
   "timestamp": "2026-08-18T14:23:52.000Z"
@@ -43,7 +43,7 @@ Host: your-worker.workers.dev
 
 ### `GET /form-handler.js`
 
-Serves the built-in FormFlare client JavaScript library file with proper `Content-Type: application/javascript`, CORS headers, and edge caching (`Cache-Control: public, max-age=3600`).
+Serves the built-in FreeFormer client JavaScript library file with proper `Content-Type: application/javascript`, CORS headers, and edge caching (`Cache-Control: public, max-age=3600`).
 
 #### Request
 ```html
@@ -70,7 +70,7 @@ Content-Type: application/json
   "data": {
     "name": "Jane Doe",
     "email": "jane@example.com",
-    "message": "Hello from FormFlare!"
+    "message": "Hello from FreeFormer!"
   }
 }
 ```
@@ -96,7 +96,7 @@ Content-Type: application/json
 ```json
 {
   "success": false,
-  "error": "Site ID is required. Please provide 'siteId' in the payload or specify 'data-formflare-site' on your form."
+  "error": "Site ID is required. Please provide 'siteId' in the payload or specify 'data-freeformer-site' on your form."
 }
 ```
 
@@ -155,7 +155,7 @@ Authorization: Bearer YOUR_API_KEY
       "data": {
         "name": "Jane Doe",
         "email": "jane@example.com",
-        "message": "Hello from FormFlare!"
+        "message": "Hello from FreeFormer!"
       },
       "metadata": {
         "ip": "203.0.113.195",
@@ -195,7 +195,7 @@ Authorization: Bearer YOUR_API_KEY
     "data": {
       "name": "Jane Doe",
       "email": "jane@example.com",
-      "message": "Hello from FormFlare!"
+      "message": "Hello from FreeFormer!"
     },
     "metadata": {
       "ip": "203.0.113.195",

@@ -24,7 +24,7 @@ export async function verifyTurnstile(
         if (logger) {
             logger.debug('Turnstile', '⚡ Dev Mock Verification Auto-Passed');
         } else {
-            console.log('⚡ [FormFlare Turnstile] Dev Mock Verification Auto-Passed');
+            console.log('⚡ [FreeFormer Turnstile] Dev Mock Verification Auto-Passed');
         }
         return {
             success: true,

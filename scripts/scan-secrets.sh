@@ -1,10 +1,10 @@
 #!/bin/bash
-# FormFlare Dynamic Pre-Commit Security Scanner
+# FreeFormer Dynamic Pre-Commit Security Scanner
 # Dynamically detects leaked credentials, email patterns, and domain route bindings in staged files.
 
 ERRORS=0
 
-echo "🔍 Running FormFlare Pre-Commit Security & Docs Quality Gate..."
+echo "🔍 Running FreeFormer Pre-Commit Security & Docs Quality Gate..."
 
 # 0. Check if documentation is in sync with config-manifest.json
 node scripts/sync-docs.js --check

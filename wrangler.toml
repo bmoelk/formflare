@@ -1,4 +1,4 @@
-name = "formflare"
+name = "freeformer"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
@@ -36,7 +36,7 @@ EMAIL_PROVIDER = "none"
 
 # [[d1_databases]]
 # binding = "DB"
-# database_name = "formflare-db"
+# database_name = "freeformer-db"
 # database_id = "YOUR_DATABASE_ID"
 
 # Production Secrets (Set via: npx wrangler secret put SECRET_NAME)

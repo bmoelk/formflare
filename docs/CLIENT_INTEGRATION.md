@@ -1,12 +1,12 @@
-# FormFlare Client Integration Guide 💻
+# FreeFormer Client Integration Guide 💻
 
-This guide covers integrating FormFlare with your frontend websites—from zero-config static HTML forms to single-page applications (React, Vue, Svelte, Astro).
+This guide covers integrating FreeFormer with your frontend websites—from zero-config static HTML forms to single-page applications (React, Vue, Svelte, Astro).
 
 ---
 
 ## 1. Quick Integration: Vanilla HTML & Fetch
 
-The simplest way to submit a form to FormFlare without external dependencies:
+The simplest way to submit a form to FreeFormer without external dependencies:
 
 ```html
 <!-- 1. Include Cloudflare Turnstile API -->
@@ -17,8 +17,8 @@ The simplest way to submit a form to FormFlare without external dependencies:
   id="contact-form"
   action="https://your-worker.workers.dev/submit"
   method="POST"
-  data-formflare="contact"
-  data-formflare-site="splitphase.io"
+  data-freeformer="contact"
+  data-freeformer-site="splitphase.io"
 >
   <input type="text" name="name" placeholder="Your Name" required />
   <input type="email" name="email" placeholder="Your Email" required />
@@ -46,15 +46,15 @@ The simplest way to submit a form to FormFlare without external dependencies:
     const data = Object.fromEntries(formData.entries());
     delete data['cf-turnstile-response']; // Keep payload clean
 
-    // Auto-extract domain if data-formflare-site is omitted
-    const siteId = form.dataset.formflareSite || window.location.hostname.replace(/^www\./i, '');
+    // Auto-extract domain if data-freeformer-site is omitted
+    const siteId = form.dataset.freeformerSite || window.location.hostname.replace(/^www\./i, '');
 
     try {
       const res = await fetch(form.action, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          formId: form.dataset.formflare || 'contact',
+          formId: form.dataset.freeformer || 'contact',
           siteId: siteId,
           turnstileToken: token,
           data,
@@ -80,24 +80,24 @@ The simplest way to submit a form to FormFlare without external dependencies:
 
 ---
 
-## 2. Using the FormFlare Client Library (`/form-handler.js`)
+## 2. Using the FreeFormer Client Library (`/form-handler.js`)
 
-FormFlare serves a lightweight (under 2KB) drop-in client library directly from your Worker.
+FreeFormer serves a lightweight (under 2KB) drop-in client library directly from your Worker.
 
 ### Option A: Automatic Initialization via HTML Data Attributes
 
-Simply tag any form with `data-formflare`, and the library automatically handles Turnstile token extraction, submission lifecycle, and UI feedback states:
+Simply tag any form with `data-freeformer`, and the library automatically handles Turnstile token extraction, submission lifecycle, and UI feedback states:
 
 ```html
-<!-- Include Turnstile and FormFlare scripts -->
+<!-- Include Turnstile and FreeFormer scripts -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script src="https://your-worker.workers.dev/form-handler.js"></script>
 
 <form
   action="https://your-worker.workers.dev/submit"
   method="POST"
-  data-formflare="contact-form"
-  data-formflare-site="splitphase.io"
+  data-freeformer="contact-form"
+  data-freeformer-site="splitphase.io"
 >
   <input type="text" name="name" placeholder="Your Name" required />
   <input type="email" name="email" placeholder="Your Email" required />
@@ -111,7 +111,7 @@ Simply tag any form with `data-formflare`, and the library automatically handles
 ### Option B: Programmatic Initialization via JavaScript
 
 ```javascript
-FormFlare.init({
+FreeFormer.init({
   workerUrl: 'https://your-worker.workers.dev',
   siteId: 'splitphase.io', // Optional: defaults to window.location.hostname
   turnstileSiteKey: 'YOUR_TURNSTILE_SITE_KEY', // Automatically creates Turnstile widget if omitted in HTML
@@ -122,12 +122,12 @@ FormFlare.init({
 // Listen for custom lifecycle events
 const form = document.getElementById('contact-form');
 
-form.addEventListener('formflare:success', (e) => {
+form.addEventListener('freeformer:success', (e) => {
   console.log('Submission ID:', e.detail.submissionId);
   // e.g., redirect to /thank-you or trigger analytics event
 });
 
-form.addEventListener('formflare:error', (e) => {
+form.addEventListener('freeformer:error', (e) => {
   console.error('Submission failed:', e.detail.error);
 });
 ```
@@ -138,8 +138,8 @@ form.addEventListener('formflare:error', (e) => {
 
 | Attribute | Description | Example |
 | :--- | :--- | :--- |
-| `data-formflare` | Unique form identifier *(Required)* | `data-formflare="contact-form"` |
-| `data-formflare-site` | Site ID or domain name. If omitted, automatically extracts current webpage hostname. | `data-formflare-site="splitphase.io"` |
+| `data-freeformer` | Unique form identifier *(Required)* | `data-freeformer="contact-form"` |
+| `data-freeformer-site` | Site ID or domain name. If omitted, automatically extracts current webpage hostname. | `data-freeformer-site="splitphase.io"` |
 | `data-success-message` | Custom success message displayed above form | `data-success-message="Thank you! We'll reply shortly."` |
 | `data-redirect` | Optional URL redirect upon successful submission | `data-redirect="/thank-you"` |
 
@@ -147,14 +147,14 @@ form.addEventListener('formflare:error', (e) => {
 
 ## 4. Multi-Tenant Architecture & Domain Resolution
 
-FormFlare is designed to power multiple separate websites from a single Worker deployment with zero cross-talk.
+FreeFormer is designed to power multiple separate websites from a single Worker deployment with zero cross-talk.
 
 ### 1. Automatic Domain Extraction (Zero-Config)
-* **Client-Side**: If `data-formflare-site` is omitted, the client library automatically uses `window.location.hostname.replace(/^www\./i, '')` (e.g. `splitphase.io`).
+* **Client-Side**: If `data-freeformer-site` is omitted, the client library automatically uses `window.location.hostname.replace(/^www\./i, '')` (e.g. `splitphase.io`).
 * **Server-Side**: If a direct submission omits `siteId`, the server extracts the domain from the HTTP `Origin` or `Referer` headers.
 
 ### 2. Smart Secret & Variable Resolution
-When a form submits under a domain (e.g. `siteId = "splitphase.io"`), FormFlare automatically searches for secrets and routing variables using normalized fallbacks:
+When a form submits under a domain (e.g. `siteId = "splitphase.io"`), FreeFormer automatically searches for secrets and routing variables using normalized fallbacks:
 
 ```text
 siteId: "splitphase.io"
@@ -173,5 +173,5 @@ This resolution order applies to:
 * **Webhooks**: `WEBHOOK_URL_${SITE_ID}` $\rightarrow$ `WEBHOOK_URL`
 
 ### 3. Separation of Form Data vs. System Metadata
-* **System Metadata** (`formId`, `siteId`, `turnstileToken`) must always be specified via `<form>` dataset attributes (`data-formflare`, `data-formflare-site`) or JS configuration—**never via hidden HTML `<input>` tags**.
+* **System Metadata** (`formId`, `siteId`, `turnstileToken`) must always be specified via `<form>` dataset attributes (`data-freeformer`, `data-freeformer-site`) or JS configuration—**never via hidden HTML `<input>` tags**.
 * **Form Payload Data**: Hidden HTML `<input>` tags inside forms are strictly preserved for user and business form payload data.

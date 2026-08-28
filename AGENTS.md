@@ -1,13 +1,13 @@
-# FormFlare Agentic & Developer Guidelines (AGENTS.md)
+# FreeFormer Agentic & Developer Guidelines (AGENTS.md)
 
-This file defines coding standards, repository policies, and security guardrails for AI coding assistants (Antigravity, Claude Code, Cursor, Copilot) and human contributors working on **FormFlare**.
+This file defines coding standards, repository policies, and security guardrails for AI coding assistants (Antigravity, Claude Code, Cursor, Copilot) and human contributors working on **FreeFormer**.
 
 ---
 
 ## 🔒 Zero-Secrets Public Repository Policy
 
 > [!IMPORTANT]
-> **FormFlare is an open-source public repository.**
+> **FreeFormer is an open-source public repository.**
 > 
 > 1. **`wrangler.toml` MUST remain 100% generic**:
 >    - Never hardcode personal email addresses (`user@example.com`), custom domain origin lists (`ALLOWED_ORIGINS = "https://..."`), or production KV/D1 binding UUIDs inside `wrangler.toml`.
@@ -30,7 +30,7 @@ This file defines coding standards, repository policies, and security guardrails
 ## 🏗 Multi-Tenant Architecture: Per-Site Resolution
 
 1. **Site Identification (`siteId`)**:
-   - Explicit attribute on forms (e.g. `data-formflare-site="splitphase.io"` or `FormFlare.init({ siteId: 'splitphase.io' })`).
+   - Explicit attribute on forms (e.g. `data-freeformer-site="splitphase.io"` or `FreeFormer.init({ siteId: 'splitphase.io' })`).
    - If omitted, automatically derived from the hosting page's hostname (e.g. `window.location.hostname` or HTTP `Origin`/`Referer` -> `splitphase.io`).
    - Standardized to lowercase string across KV keys (`submission:splitphase.io:...`) and SQL queries (`WHERE site_id = 'splitphase.io'`).
 2. **Smart Secret & Variable Resolution**:
@@ -51,14 +51,14 @@ This file defines coding standards, repository policies, and security guardrails
 
 ## 🎨 Separation of Form Data vs. System Metadata
 
-1. **System Metadata** (`formId`, `siteId`, `turnstileToken`) must be specified via `<form>` dataset attributes (`data-formflare`, `data-formflare-site`) or client JS config—**never via hidden HTML `<input>` tags**.
+1. **System Metadata** (`formId`, `siteId`, `turnstileToken`) must be specified via `<form>` dataset attributes (`data-freeformer`, `data-freeformer-site`) or client JS config—**never via hidden HTML `<input>` tags**.
 2. Hidden HTML `<input>` tags inside forms are reserved strictly for user/business form payload data.
 
 ---
 
 ## 🧪 Pre-Commit Quality Gate & Security Scanner
 
-Before creating any git commits, FormFlare runs an automated quality gate (`npm run pre-commit` / `bash scripts/scan-secrets.sh`). Commits are automatically blocked if any of the following 4 checks fail:
+Before creating any git commits, FreeFormer runs an automated quality gate (`npm run pre-commit` / `bash scripts/scan-secrets.sh`). Commits are automatically blocked if any of the following 4 checks fail:
 
 1. **Documentation & Manifest Sync Check (`scripts/sync-docs.js --check`)**:
    - Verifies that the reference table in `docs/SETUP.md` matches `config-manifest.json` exactly.
@@ -82,7 +82,7 @@ npm run pre-commit
 
 ## 🚀 Post-Deployment Verification & Key Cross-Referencing
 
-After running deployments (`npm run deploy:prod` / `npx wrangler deploy -c wrangler.overrides.toml`), FormFlare runs `scripts/verify-deploy.js` to execute live health checks:
+After running deployments (`npm run deploy:prod` / `npx wrangler deploy -c wrangler.overrides.toml`), FreeFormer runs `scripts/verify-deploy.js` to execute live health checks:
 
 1. **Live Binding Diagnostics (`GET /`)**: Verifies KV/D1 storage, email provider, and Turnstile secrets on the remote Worker isolate.
 2. **Local vs. Remote Key Cross-Referencing**:

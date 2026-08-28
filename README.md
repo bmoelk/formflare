@@ -1,8 +1,12 @@
-# FormFlare 🚀
+<p align="center">
+  <img src="public/logo.jpg" alt="FreeFormer Logo" width="180" style="border-radius: 24px;" />
+</p>
+
+# FreeFormer
 
 **A powerful, spam-protected form backend for static websites built on Cloudflare Workers, Hono, and D1/KV**
 
-FormFlare provides a complete, edge-native backend for collecting form submissions from static websites. It combines Cloudflare Turnstile spam protection with flexible storage, rate limiting, and local DX mocking.
+FreeFormer provides a complete, edge-native backend for collecting form submissions from static websites. It combines Cloudflare Turnstile spam protection with flexible storage, rate limiting, and local DX mocking.
 
 ---
 
@@ -25,7 +29,7 @@ All detailed guides and architecture references are maintained in the [`docs/`](
 
 * 📋 **[SETUP.md](docs/SETUP.md)** — Step-by-step setup, storage options, and auto-generated environment variables reference.
 * 📡 **[API_ENDPOINTS.md](docs/API_ENDPOINTS.md)** — Complete REST API endpoints specification, diagnostic status, and error codes.
-* 💻 **[CLIENT_INTEGRATION.md](docs/CLIENT_INTEGRATION.md)** — Frontend integration guide (Vanilla HTML/JS, FormFlare Client Library, Multi-Tenant `data-` attributes).
+* 💻 **[CLIENT_INTEGRATION.md](docs/CLIENT_INTEGRATION.md)** — Frontend integration guide (Vanilla HTML/JS, FreeFormer Client Library, Multi-Tenant `data-` attributes).
 * 📧 **[EMAIL_AND_WEBHOOKS.md](docs/EMAIL_AND_WEBHOOKS.md)** — Outbound email providers, Mustache template customization, and Webhook dispatching.
 * 🔒 **[AGENTS.md](AGENTS.md)** — Developer & AI agent zero-secrets policy and coding standards.
 
@@ -50,7 +54,7 @@ npm run setup
 npm run dev
 ```
 
-FormFlare will start locally at `http://localhost:8787`.
+FreeFormer will start locally at `http://localhost:8787`.
 
 ### 3. Deploy to Cloudflare
 
@@ -67,11 +71,11 @@ npm run deploy
 
 ### 🎨 Frontend Integration
 
-FormFlare offers two clean ways to integrate with your static website:
+FreeFormer offers two clean ways to integrate with your static website:
 
 #### Method 1: Built-in Client Library (Recommended)
 
-The easiest way to integrate FormFlare is to load the built-in client library script served directly by your Worker:
+The easiest way to integrate FreeFormer is to load the built-in client library script served directly by your Worker:
 
 ```html
 <!DOCTYPE html>
@@ -80,8 +84,8 @@ The easiest way to integrate FormFlare is to load the built-in client library sc
     <title>Contact Form</title>
 </head>
 <body>
-    <!-- Add data-formflare attribute with your form ID -->
-    <form id="contact-form" data-formflare="contact-form">
+    <!-- Add data-freeformer attribute with your form ID -->
+    <form id="contact-form" data-freeformer="contact-form">
         <input type="text" name="name" placeholder="Name" required>
         <input type="email" name="email" placeholder="Email" required>
         <textarea name="message" placeholder="Message" required></textarea>
@@ -90,19 +94,19 @@ The easiest way to integrate FormFlare is to load the built-in client library sc
         <button type="submit">Submit</button>
     </form>
 
-    <!-- Load FormFlare client library from your worker -->
+    <!-- Load FreeFormer client library from your worker -->
     <script src="https://your-worker.workers.dev/form-handler.js"></script>
     
-    <!-- Initialize FormFlare -->
+    <!-- Initialize FreeFormer -->
     <script>
-        FormFlare.init({
+        FreeFormer.init({
             workerUrl: 'https://your-worker.workers.dev',
             turnstileSiteKey: 'YOUR_SITE_KEY',
-            autoInit: true  // Automatically handles forms with data-formflare
+            autoInit: true  // Automatically handles forms with data-freeformer
         });
 
         // Optional: Listen to submission events
-        document.getElementById('contact-form').addEventListener('formflare:success', (e) => {
+        document.getElementById('contact-form').addEventListener('freeformer:success', (e) => {
             console.log('Submitted!', e.detail.submissionId);
         });
     </script>
@@ -174,7 +178,7 @@ For complete custom control, you can post directly to the `/submit` endpoint:
 
 ## 🔗 Webhook Notifications
 
-FormFlare can dispatch HTTP POST requests to webhooks whenever a valid form submission is received.
+FreeFormer can dispatch HTTP POST requests to webhooks whenever a valid form submission is received.
 
 ### 1. Configuration & Secret Keys
 
@@ -206,8 +210,8 @@ npx wrangler secret put WEBHOOK_URL_BRAINENDEAVOR
 
 ### 3. Headers Sent
 * `Content-Type`: `application/json`
-* `X-FormFlare-Event`: `submission`
-* `X-FormFlare-Signature`: `API_KEY` (if `API_KEY` secret is configured)
+* `X-FreeFormer-Event`: `submission`
+* `X-FreeFormer-Signature`: `API_KEY` (if `API_KEY` secret is configured)
 
 ---
 

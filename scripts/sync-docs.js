@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * FormFlare Documentation Synchronization Script
+ * FreeFormer Documentation Synchronization Script
  * Generates the Markdown Environment Variables reference table in docs/SETUP.md
  * directly from the single source of truth: config-manifest.json
  *

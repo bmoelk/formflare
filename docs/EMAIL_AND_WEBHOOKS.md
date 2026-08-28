@@ -1,4 +1,4 @@
-# FormFlare Outbound Delivery Guide: Emails & Webhooks 📧🔗
+# FreeFormer Outbound Delivery Guide: Emails & Webhooks 📧🔗
 
 This guide covers configuring email notifications and real-time outbound webhooks for form submissions.
 
@@ -6,7 +6,7 @@ This guide covers configuring email notifications and real-time outbound webhook
 
 ## 1. Email Notifications
 
-FormFlare supports multiple outbound email providers configured via environment variables and Cloudflare KMS secrets.
+FreeFormer supports multiple outbound email providers configured via environment variables and Cloudflare KMS secrets.
 
 ### Supported Providers (`EMAIL_PROVIDER`)
 
@@ -21,7 +21,7 @@ FormFlare supports multiple outbound email providers configured via environment 
 
 ### Global vs. Per-Site Multi-Tenant Email Routing
 
-FormFlare allows you to configure global fallback email settings as well as site-specific recipient and sender overrides using `siteId`:
+FreeFormer allows you to configure global fallback email settings as well as site-specific recipient and sender overrides using `siteId`:
 
 * **Global Defaults**: `EMAIL_TO`, `EMAIL_FROM`, `EMAIL_PROVIDER`
 * **Per-Site Overrides**: `EMAIL_TO_${SITE_ID}`, `EMAIL_FROM_${SITE_ID}`, `EMAIL_PROVIDER_${SITE_ID}` (e.g. `EMAIL_TO_MYSITE_A=team-a@example.com`, `EMAIL_TO_MYSITE_B=team-b@example.com`).
@@ -46,11 +46,11 @@ npx wrangler secret put EMAIL_API_KEY
 
 Email templates are logic-less Mustache files located in `src/templates/`:
 
-* **HTML Template**: [`src/templates/email.html.mustache`](file:///Users/bmo/code/websites/formflare/src/templates/email.html.mustache)
-* **Plaintext Fallback**: [`src/templates/email.text.mustache`](file:///Users/bmo/code/websites/formflare/src/templates/email.text.mustache)
+* **HTML Template**: [`src/templates/email.html.mustache`](file:///Users/bmo/code/websites/freeformer/src/templates/email.html.mustache)
+* **Plaintext Fallback**: [`src/templates/email.text.mustache`](file:///Users/bmo/code/websites/freeformer/src/templates/email.text.mustache)
 
 ### System Token Filtering
-FormFlare automatically sanitizes system tokens (`cf-turnstile-response`, `turnstileToken`, `formId`, `siteId`) so only actual user form input data appears in the `{{#fields}}` template loop.
+FreeFormer automatically sanitizes system tokens (`cf-turnstile-response`, `turnstileToken`, `formId`, `siteId`) so only actual user form input data appears in the `{{#fields}}` template loop.
 
 ### Template Variables Reference
 
@@ -67,7 +67,7 @@ FormFlare automatically sanitizes system tokens (`cf-turnstile-response`, `turns
 
 ## 3. Outbound Webhooks
 
-FormFlare can trigger real-time HTTP POST webhooks on successful form submissions.
+FreeFormer can trigger real-time HTTP POST webhooks on successful form submissions.
 
 ### Webhook Configuration
 
@@ -84,7 +84,7 @@ FormFlare can trigger real-time HTTP POST webhooks on successful form submission
   "data": {
     "name": "Jane Doe",
     "email": "jane@example.com",
-    "message": "Hello from FormFlare!"
+    "message": "Hello from FreeFormer!"
   },
   "metadata": {
     "ip": "203.0.113.195",
@@ -97,5 +97,5 @@ FormFlare can trigger real-time HTTP POST webhooks on successful form submission
 
 ### Webhook HTTP Headers
 * `Content-Type: application/json`
-* `X-FormFlare-Event: submission`
-* `X-FormFlare-Signature: <API_KEY>` *(Included if `API_KEY` is configured for signature authentication)*
+* `X-FreeFormer-Event: submission`
+* `X-FreeFormer-Signature: <API_KEY>` *(Included if `API_KEY` is configured for signature authentication)*

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FormFlare Advanced Example</title>
+    <title>FreeFormer Advanced Example</title>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         * {
@@ -225,7 +225,7 @@
 
 <body>
     <div class="container">
-        <h1>FormFlare Demo - Multiple Forms</h1>
+        <h1>FreeFormer Demo - Multiple Forms</h1>
 
         <div class="forms-grid">
             <!-- Contact Form -->
@@ -349,7 +349,7 @@
 
     <script>
         // Configuration
-        const FORMFLARE_URL = 'https://your-worker.workers.dev/submit';
+        const FREEFORMER_URL = 'https://your-worker.workers.dev/submit';
 
         // Stats counters
         const stats = {
@@ -360,7 +360,7 @@
 
         // Load stats from localStorage
         function loadStats() {
-            const saved = localStorage.getItem('formflare-stats');
+            const saved = localStorage.getItem('freeformer-stats');
             if (saved) {
                 Object.assign(stats, JSON.parse(saved));
                 updateStatsDisplay();
@@ -369,7 +369,7 @@
 
         // Save stats to localStorage
         function saveStats() {
-            localStorage.setItem('formflare-stats', JSON.stringify(stats));
+            localStorage.setItem('freeformer-stats', JSON.stringify(stats));
             updateStatsDisplay();
         }
 
@@ -460,15 +460,15 @@
                     return;
                 }
 
-                // Submit to FormFlare
-                const response = await fetch(FORMFLARE_URL, {
+                // Submit to FreeFormer
+                const response = await fetch(FREEFORMER_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
                         formId: formId,
-                        siteId: form.dataset.formflareSite || form.dataset.siteId || 'mysite',
+                        siteId: form.dataset.freeformerSite || form.dataset.siteId || 'mysite',
                         turnstileToken: turnstileToken,
                         data: data,
                     }),

@@ -1,4 +1,4 @@
-# FormFlare Development Environment Variables
+# FreeFormer Development Environment Variables
 # Copy this file to .dev.vars for local development:
 #   cp .dev.vars.example .dev.vars
 # DO NOT commit .dev.vars to version control!

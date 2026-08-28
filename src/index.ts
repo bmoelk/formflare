@@ -181,7 +181,7 @@ app.get('/', (c) => {
     const logger = createLogger(c.env as Record<string, string | undefined>);
 
     return c.json({
-        service: 'FormFlare',
+        service: 'FreeFormer',
         version: '1.0.0',
         status: 'healthy',
         environment: c.env.ENVIRONMENT || 'production',
@@ -323,7 +323,7 @@ app.post('/submit', async (c) => {
             return c.json(
                 {
                     success: false,
-                    error: "Site ID is required. Please provide 'siteId' in the payload, specify 'data-formflare-site' on your form, or host on a recognized domain.",
+                    error: "Site ID is required. Please provide 'siteId' in the payload, specify 'data-freeformer-site' on your form, or host on a recognized domain.",
                 },
                 400
             );
@@ -445,8 +445,8 @@ app.post('/submit', async (c) => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-FormFlare-Event': 'submission',
-                    'X-FormFlare-Signature': c.env.API_KEY || '' // Simple auth if key exists
+                    'X-FreeFormer-Event': 'submission',
+                    'X-FreeFormer-Signature': c.env.API_KEY || '' // Simple auth if key exists
                 },
                 body: JSON.stringify({
                     id: submissionId,
@@ -624,7 +624,7 @@ app.post('/email-test', async (c) => {
             formId: 'test-email-form',
             submissionId: 'test-' + Date.now(),
             data: {
-                message: 'This is a test email from FormFlare.',
+                message: 'This is a test email from FreeFormer.',
                 timestamp: new Date().toISOString(),
                 test: true
             },
